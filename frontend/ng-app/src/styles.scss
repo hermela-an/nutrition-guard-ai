@@ -86,6 +86,12 @@ a {
   border-radius: 999px;
   font-weight: 700;
   cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(26, 34, 22, 0.14);
 }
 
 .btn.primary {
@@ -148,6 +154,16 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+.card.clickable-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card.clickable-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(26, 34, 22, 0.14);
+  border-color: #c8d4bd;
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -181,6 +197,13 @@ h1 {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 16px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.feature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(26, 34, 22, 0.12);
+  border-color: #c8d4bd;
 }
 
 .auth-wrap {
@@ -243,6 +266,8 @@ textarea {
   border-right: 1px solid var(--line);
   background: #f0f4e8;
   padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
 }
 
 .menu {
@@ -256,6 +281,12 @@ textarea {
   border-radius: 10px;
   color: var(--muted);
   font-weight: 600;
+  border: 1px solid transparent;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.menu a:hover {
+  transform: translateX(2px);
 }
 
 .menu a.active,
@@ -263,6 +294,15 @@ textarea {
   background: #fff;
   color: var(--text);
   border: 1px solid var(--line);
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.logout-btn {
+  width: 100%;
 }
 
 .main {
@@ -505,3 +545,4 @@ textarea {
     display: none;
   }
 }
+

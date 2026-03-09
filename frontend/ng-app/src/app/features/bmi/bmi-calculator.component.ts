@@ -48,7 +48,7 @@ import { ProfileService } from '../../core/services/profile.service';
     </section>
 
     <div class="note-box">Note: BMI is a screening tool and does not measure body fat directly.</div>
-    <p style="margin-top:16px;"><a routerLink="/dashboard" style="color:#3d64d8; font-weight:700;">Back to Dashboard</a></p>
+    <p style="margin-top:16px;"><a routerLink="/nutrition-plan" style="color:#3d64d8; font-weight:700;">Generate Nutrition Plan</a></p>
   </app-shell>
   `
 })

@@ -1,6 +1,7 @@
-﻿import { Component, Input } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
 
 interface MenuItem {
   label: string;
@@ -18,6 +19,9 @@ interface MenuItem {
         <nav class="menu">
           <a *ngFor="let item of items" [routerLink]="item.path" routerLinkActive="active">{{ item.label }}</a>
         </nav>
+        <div class="sidebar-bottom">
+          <button type="button" class="btn ghost logout-btn" (click)="logout()">Logout</button>
+        </div>
       </aside>
       <main class="main">
         <ng-content></ng-content>
@@ -27,4 +31,12 @@ interface MenuItem {
 })
 export class AppShellComponent {
   @Input({ required: true }) items: MenuItem[] = [];
+
+  constructor(private readonly auth: AuthService, private readonly router: Router) {}
+
+  logout(): void {
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
 }
+
