@@ -1,0 +1,60 @@
+package com.nutritionguard.app.repository;
+
+import com.nutritionguard.app.db.Database;
+import io.vertx.core.Future;
+import io.vertx.core.json.JsonObject;
+import io.vertx.sqlclient.Row;
+import io.vertx.sqlclient.Tuple;
+
+public class ProfileRepository {
+  private final Database db;
+
+  public ProfileRepository(Database db) {
+    this.db = db;
+  }
+
+  public Future<JsonObject> upsertProfile(String userId, JsonObject body) {
+    String sql = """
+      INSERT INTO profiles (user_id, age, gender, height_cm, weight_kg, activity_level, goal, health_metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      ON CONFLICT (user_id) DO UPDATE
+      SET age = EXCLUDED.age,
+          gender = EXCLUDED.gender,
+          height_cm = EXCLUDED.height_cm,
+          weight_kg = EXCLUDED.weight_kg,
+          activity_level = EXCLUDED.activity_level,
+          goal = EXCLUDED.goal,
+          health_metadata = EXCLUDED.health_metadata,
+          updated_at = now()
+      RETURNING user_id, age, gender, height_cm, weight_kg, activity_level, goal, health_metadata
+      """;
+    return db.query(sql, Tuple.of(
+      userId,
+      body.getInteger("age"),
+      body.getString("gender"),
+      body.getDouble("height_cm"),
+      body.getDouble("weight_kg"),
+      body.getString("activity_level"),
+      body.getString("goal"),
+      body.getJsonObject("health_metadata", new JsonObject()).encode()
+    )).map(rows -> map(rows.iterator().next()));
+  }
+
+  public Future<JsonObject> getProfile(String userId) {
+    String sql = "SELECT user_id, age, gender, height_cm, weight_kg, activity_level, goal, health_metadata FROM profiles WHERE user_id = $1";
+    return db.query(sql, Tuple.of(userId))
+      .map(rows -> rows.iterator().hasNext() ? map(rows.iterator().next()) : null);
+  }
+
+  private JsonObject map(Row row) {
+    return new JsonObject()
+      .put("user_id", row.getString("user_id"))
+      .put("age", row.getInteger("age"))
+      .put("gender", row.getString("gender"))
+      .put("height_cm", row.getDouble("height_cm"))
+      .put("weight_kg", row.getDouble("weight_kg"))
+      .put("activity_level", row.getString("activity_level"))
+      .put("goal", row.getString("goal"))
+      .put("health_metadata", row.getJsonObject("health_metadata"));
+  }
+}

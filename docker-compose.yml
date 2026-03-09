@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    container_name: nutritionguard-postgres
+    environment:
+      POSTGRES_DB: nutritionguard
+      POSTGRES_USER: nutritionguard
+      POSTGRES_PASSWORD: nutritionguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d/01_migrations
+      - ./database/seed:/docker-entrypoint-initdb.d/02_seed
+
+volumes:
+  pgdata:
