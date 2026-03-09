@@ -89,7 +89,13 @@ export class SignupComponent {
       },
       error: (err) => {
         this.error = true;
-        this.status = err?.error || 'Signup failed';
+        if (err?.status === 0) {
+          this.status = 'Cannot reach server. Please ensure backend is running.';
+        } else if (typeof err?.error === 'string' && err.error.trim()) {
+          this.status = err.error;
+        } else {
+          this.status = 'Signup failed';
+        }
         this.loading = false;
       },
       complete: () => (this.loading = false)
