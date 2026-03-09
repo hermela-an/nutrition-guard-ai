@@ -420,6 +420,25 @@ textarea {
   font-weight: 800;
 }
 
+.status {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.status.ok {
+  background: #e4f5eb;
+  color: #176742;
+  border: 1px solid #bfe8cf;
+}
+
+.status.err {
+  background: #fde8e8;
+  color: #8e2f2f;
+  border: 1px solid #f2c0c0;
+}
+
 @media (max-width: 980px) {
   .hero-grid,
   .feature-grid,

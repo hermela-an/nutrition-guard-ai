@@ -1,43 +1,39 @@
-# Frontend Structure (Commit Scope 1)
+# Frontend (Angular)
 
-This commit keeps a professional frontend folder layout while focusing on the highest-priority pages.
+The frontend is now a real Angular application.
 
 ## Structure
 
 ```text
 frontend/
-  src/
-    index.html
-    shared/
-      assets/
-        styles.css
-    pages/
-      landing.html                # Completed
-      auth/
-        login.html                # Completed
-        signup.html               # Completed
-      profile/
-        profile-setup.html        # Completed
-      placeholders/
-        dashboard.html
-        bmi-calculator.html
-        nutrition-plan.html
-        daily-meal-plan.html
-        progress-tracking.html
-        ai-chat-assistant.html
-        food-search.html
-        notifications.html
+  ng-app/
+    src/
+      app/
+        core/
+          config/
+          guards/
+          services/
+        shared/
+          components/
+        features/
+          landing/
+          auth/login/
+          auth/signup/
+          profile/
+          dashboard/
+          bmi/
+          placeholder/
 ```
 
-## Completed In This Phase
-- Landing page
-- Login page
-- Signup page
-- Profile Setup page
-- Dashboard page
-- BMI Calculator page
+## Implemented Pages
+- Landing
+- Login (real API call)
+- Signup (real API call)
+- Profile Setup (real load/save with JWT)
+- Dashboard
+- BMI Calculator
 
-## Placeholder In This Phase
+## Placeholder Pages
 - Nutrition Plan
 - Daily Meal Plan
 - Progress Tracking
@@ -46,11 +42,11 @@ frontend/
 - Notifications
 
 ## Run Locally
-From project root:
 
 ```powershell
-cd frontend/src
-python -m http.server 5173
+cd frontend/ng-app
+npm.cmd install
+npm.cmd start
 ```
 
-Open: `http://localhost:5173`
+Open: `http://localhost:4200`

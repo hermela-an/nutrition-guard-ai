@@ -28,7 +28,10 @@ public class ProfileController {
       String userId = ctx.get("user_id");
       profiles.saveProfile(userId, ctx.body().asJsonObject())
         .onSuccess(saved -> ctx.response().putHeader("Content-Type", "application/json").end(saved.encode()))
-        .onFailure(err -> ctx.response().setStatusCode(400).end(err.getMessage()));
+        .onFailure(err -> {
+          String message = err.getMessage() == null ? err.toString() : err.getMessage();
+          ctx.response().setStatusCode(400).end(message);
+        });
     });
   }
 }

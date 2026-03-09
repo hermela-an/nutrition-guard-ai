@@ -7,11 +7,11 @@ services:
       POSTGRES_USER: nutritionguard
       POSTGRES_PASSWORD: nutritionguard
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d/01_migrations
-      - ./database/seed:/docker-entrypoint-initdb.d/02_seed
+      - ./database/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - ./database/seed/001_food_items.sql:/docker-entrypoint-initdb.d/002_food_items.sql
 
 volumes:
   pgdata:

@@ -43,7 +43,7 @@ docker compose up -d
 ```powershell
 $env:APP_PORT="8080"
 $env:DB_HOST="localhost"
-$env:DB_PORT="5432"
+$env:DB_PORT="5433"
 $env:DB_NAME="nutritionguard"
 $env:DB_USER="nutritionguard"
 $env:DB_PASSWORD="nutritionguard"

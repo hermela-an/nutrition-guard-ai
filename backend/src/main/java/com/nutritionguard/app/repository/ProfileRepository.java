@@ -30,13 +30,13 @@ public class ProfileRepository {
       """;
     return db.query(sql, Tuple.of(
       userId,
-      body.getInteger("age"),
+      asInt(body, "age"),
       body.getString("gender"),
-      body.getDouble("height_cm"),
-      body.getDouble("weight_kg"),
+      asDouble(body, "height_cm"),
+      asDouble(body, "weight_kg"),
       body.getString("activity_level"),
       body.getString("goal"),
-      body.getJsonObject("health_metadata", new JsonObject()).encode()
+      body.getJsonObject("health_metadata", new JsonObject())
     )).map(rows -> map(rows.iterator().next()));
   }
 
@@ -47,6 +47,16 @@ public class ProfileRepository {
   }
 
   private JsonObject map(Row row) {
+    Object rawHealth = row.getValue("health_metadata");
+    JsonObject healthMetadata;
+    if (rawHealth instanceof JsonObject health) {
+      healthMetadata = health;
+    } else if (rawHealth instanceof String text && !text.isBlank()) {
+      healthMetadata = new JsonObject(text);
+    } else {
+      healthMetadata = new JsonObject();
+    }
+
     return new JsonObject()
       .put("user_id", row.getString("user_id"))
       .put("age", row.getInteger("age"))
@@ -55,6 +65,28 @@ public class ProfileRepository {
       .put("weight_kg", row.getDouble("weight_kg"))
       .put("activity_level", row.getString("activity_level"))
       .put("goal", row.getString("goal"))
-      .put("health_metadata", row.getJsonObject("health_metadata"));
+      .put("health_metadata", healthMetadata);
+  }
+
+  private Integer asInt(JsonObject obj, String key) {
+    Object value = obj.getValue(key);
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    if (value instanceof String text && !text.isBlank()) {
+      return Integer.parseInt(text);
+    }
+    return null;
+  }
+
+  private Double asDouble(JsonObject obj, String key) {
+    Object value = obj.getValue(key);
+    if (value instanceof Number number) {
+      return number.doubleValue();
+    }
+    if (value instanceof String text && !text.isBlank()) {
+      return Double.parseDouble(text);
+    }
+    return null;
   }
 }
