@@ -14,16 +14,68 @@
     <aside class="sidebar">
       <a class="brand" href="../landing.html"><span class="brand-dot"></span> NutriGuard AI</a>
       <nav class="menu">
-        <a href="../profile/profile-setup.html">Profile Setup</a>
         <a class="active" href="./dashboard.html">Dashboard</a>
+        <a href="../profile/profile-setup.html">Profile Setup</a>
+        <a href="./bmi-calculator.html">BMI Calculator</a>
+        <a href="./nutrition-plan.html">Nutrition Plan</a>
+        <a href="./daily-meal-plan.html">Daily Meal Plan</a>
+        <a href="./progress-tracking.html">Progress Tracking</a>
+        <a href="./ai-chat-assistant.html">AI Chat Assistant</a>
+        <a href="./food-search.html">Food Search</a>
+        <a href="./notifications.html">Notifications</a>
       </nav>
     </aside>
     <main class="main">
-      <h2>Dashboard</h2>
-      <div class="card" style="margin-top:12px;">
-        <p><strong>Placeholder:</strong> This page is intentionally kept as placeholder for this commit phase.</p>
-        <p>Next iteration will replace this with full production UI and backend integration.</p>
-        <a class="btn ghost" href="../profile/profile-setup.html">Back to Profile Setup</a>
+      <div class="spaced">
+        <div>
+          <h2>User Dashboard</h2>
+          <p class="muted">Welcome back. Here is your health and nutrition snapshot for today.</p>
+        </div>
+        <a class="btn ghost" href="../profile/profile-setup.html">Edit Profile</a>
+      </div>
+
+      <div class="grid-3" style="margin-top:12px;">
+        <div class="card">
+          <small class="muted">Target Calories</small>
+          <div class="stat-value">2,020</div>
+          <span class="pill safe">On Track</span>
+        </div>
+        <div class="card">
+          <small class="muted">Sodium Consumed</small>
+          <div class="stat-value">1,120 mg</div>
+          <span class="pill caution">75% of Limit</span>
+        </div>
+        <div class="card">
+          <small class="muted">Weight Trend (30d)</small>
+          <div class="stat-value">-1.6 kg</div>
+          <span class="pill safe">Progressing</span>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px;">
+        <section class="card">
+          <h3>Today's Meal Summary</h3>
+          <table class="table" style="margin-top:10px;">
+            <tr><th>Meal</th><th>Status</th><th>Calories</th></tr>
+            <tr><td>Breakfast</td><td><span class="pill safe">Safe</span></td><td>410</td></tr>
+            <tr><td>Lunch</td><td><span class="pill safe">Safe</span></td><td>620</td></tr>
+            <tr><td>Dinner</td><td><span class="pill caution">Adjust Portion</span></td><td>710</td></tr>
+          </table>
+        </section>
+
+        <section class="card">
+          <h3>Quick Actions</h3>
+          <div class="feature-grid" style="grid-template-columns:1fr; margin-top:10px;">
+            <a class="feature" href="./bmi-calculator.html"><strong>Open BMI Calculator</strong><p>Recalculate BMI and healthy range.</p></a>
+            <a class="feature" href="./food-search.html"><strong>Search Foods</strong><p>Check safe/caution/avoid for your profile.</p></a>
+            <a class="feature" href="./ai-chat-assistant.html"><strong>Ask AI Assistant</strong><p>Get vitamins and nutrient explanations.</p></a>
+          </div>
+        </section>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <h3>System Notes</h3>
+        <p class="muted">Your current profile includes High BP. Daily sodium should remain under 1,500mg.</p>
       </div>
     </main>
   </div>

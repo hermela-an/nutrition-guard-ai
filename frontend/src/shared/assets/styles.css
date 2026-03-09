@@ -98,6 +98,11 @@ a {
   border: 1px solid var(--line);
 }
 
+.btn.alt {
+  background: #5f6f91;
+  color: #fff;
+}
+
 .hero {
   padding: 78px 0 58px;
 }
@@ -344,6 +349,75 @@ textarea {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.list {
+  margin: 10px 0 0;
+}
+
+.list li {
+  margin: 8px 0;
+}
+
+.result-panel {
+  background: #f3f6fb;
+  border: 1px solid #d8e1ef;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.result-panel .good {
+  color: #1f8f5f;
+  font-weight: 800;
+}
+
+.bmi-scale {
+  margin-top: 14px;
+}
+
+.bmi-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7bc6f5, #7ce1d6, #b7df7f, #e9c27a, #f2a1a1);
+}
+
+.bmi-marker {
+  position: absolute;
+  top: -5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #18273a;
+  box-shadow: 0 0 0 2px #18273a;
+  transform: translateX(-50%);
+}
+
+.bmi-labels {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  color: #495162;
+  font-weight: 600;
+}
+
+.note-box {
+  margin-top: 14px;
+  border-left: 5px solid #98a8bf;
+  padding: 12px 14px;
+  background: #f3f6fb;
+  border-radius: 8px;
+  color: #3e4a5f;
+}
+
+.stat-value {
+  font-size: 1.7rem;
+  font-weight: 800;
 }
 
 @media (max-width: 980px) {

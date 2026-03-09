@@ -34,10 +34,10 @@ frontend/
 - Login page
 - Signup page
 - Profile Setup page
+- Dashboard page
+- BMI Calculator page
 
 ## Placeholder In This Phase
-- Dashboard
-- BMI Calculator
 - Nutrition Plan
 - Daily Meal Plan
 - Progress Tracking

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NutriGuard AI | Bmi Calculator</title>
+  <title>NutriGuard AI | BMI Calculator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -14,17 +14,118 @@
     <aside class="sidebar">
       <a class="brand" href="../landing.html"><span class="brand-dot"></span> NutriGuard AI</a>
       <nav class="menu">
+        <a href="./dashboard.html">Dashboard</a>
         <a href="../profile/profile-setup.html">Profile Setup</a>
-        <a class="active" href="./bmi-calculator.html">Bmi Calculator</a>
+        <a class="active" href="./bmi-calculator.html">BMI Calculator</a>
+        <a href="./nutrition-plan.html">Nutrition Plan</a>
+        <a href="./daily-meal-plan.html">Daily Meal Plan</a>
+        <a href="./progress-tracking.html">Progress Tracking</a>
+        <a href="./ai-chat-assistant.html">AI Chat Assistant</a>
+        <a href="./food-search.html">Food Search</a>
+        <a href="./notifications.html">Notifications</a>
       </nav>
     </aside>
     <main class="main">
-      <h2>Bmi Calculator</h2>
-      <div class="card" style="margin-top:12px;">
-        <p><strong>Placeholder:</strong> This page is intentionally kept as placeholder for this commit phase.</p>
-        <p>Next iteration will replace this with full production UI and backend integration.</p>
-        <a class="btn ghost" href="../profile/profile-setup.html">Back to Profile Setup</a>
-      </div>
+      <h2>BMI Calculator</h2>
+      <p class="muted">Enter your height and weight to calculate BMI.</p>
+
+      <section class="card" style="margin-top:12px;">
+        <div class="field">
+          <label for="heightCm">Height (cm)</label>
+          <input id="heightCm" class="input" type="number" min="80" max="250" value="160">
+        </div>
+        <div class="field">
+          <label for="weightKg">Weight (kg)</label>
+          <input id="weightKg" class="input" type="number" min="20" max="350" value="56">
+        </div>
+        <div class="spaced" style="justify-content:flex-start; margin-top:8px;">
+          <button id="calculateBtn" class="btn primary" type="button">Calculate BMI</button>
+          <button id="resetBtn" class="btn alt" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="result-panel" style="margin-top:14px;">
+        <h3>Your Result</h3>
+        <p><strong>BMI:</strong> <span id="bmiValue">21.9</span></p>
+        <p><strong>Category:</strong> <span id="bmiCategory" class="good">Normal weight</span></p>
+        <p><strong>Healthy Weight Range:</strong> <span id="healthyRange">47.4 kg - 63.7 kg</span></p>
+
+        <div class="bmi-scale">
+          <div class="bmi-track">
+            <span id="bmiMarker" class="bmi-marker" style="left:35%;"></span>
+          </div>
+          <div class="bmi-labels">
+            <span>Underweight</span>
+            <span>Normal</span>
+            <span>Overweight</span>
+            <span>Obese</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top:14px;">
+        <h3>BMI Categories</h3>
+        <ul class="list">
+          <li><strong>Underweight:</strong> less than 18.5</li>
+          <li><strong>Normal weight:</strong> 18.5 to 24.9</li>
+          <li><strong>Overweight:</strong> 25 to 29.9</li>
+          <li><strong>Obese:</strong> 30 and above</li>
+        </ul>
+      </section>
+
+      <div class="note-box">Note: BMI is a screening tool and does not measure body fat directly.</div>
+
+      <p style="margin-top:16px;"><a href="./dashboard.html" style="color:#3d64d8; font-weight:700;">Back to Dashboard</a></p>
+
+      <script>
+        (function () {
+          var heightInput = document.getElementById("heightCm");
+          var weightInput = document.getElementById("weightKg");
+          var bmiValue = document.getElementById("bmiValue");
+          var bmiCategory = document.getElementById("bmiCategory");
+          var healthyRange = document.getElementById("healthyRange");
+          var marker = document.getElementById("bmiMarker");
+
+          function getCategory(bmi) {
+            if (bmi < 18.5) return { label: "Underweight", className: "muted" };
+            if (bmi < 25) return { label: "Normal weight", className: "good" };
+            if (bmi < 30) return { label: "Overweight", className: "muted" };
+            return { label: "Obese", className: "muted" };
+          }
+
+          function markerPosition(bmi) {
+            var normalized = Math.max(14, Math.min(40, bmi));
+            return ((normalized - 14) / (40 - 14)) * 100;
+          }
+
+          function calculate() {
+            var height = parseFloat(heightInput.value);
+            var weight = parseFloat(weightInput.value);
+            if (!height || !weight || height <= 0 || weight <= 0) return;
+
+            var h = height / 100;
+            var bmi = weight / (h * h);
+            var minHealthy = 18.5 * h * h;
+            var maxHealthy = 24.9 * h * h;
+            var category = getCategory(bmi);
+
+            bmiValue.textContent = bmi.toFixed(1);
+            bmiCategory.textContent = category.label;
+            bmiCategory.className = category.className;
+            healthyRange.textContent = minHealthy.toFixed(1) + " kg - " + maxHealthy.toFixed(1) + " kg";
+            marker.style.left = markerPosition(bmi).toFixed(1) + "%";
+          }
+
+          document.getElementById("calculateBtn").addEventListener("click", calculate);
+          document.getElementById("resetBtn").addEventListener("click", function () {
+            heightInput.value = "160";
+            weightInput.value = "56";
+            calculate();
+          });
+
+          calculate();
+        })();
+      </script>
     </main>
   </div>
 </body>
