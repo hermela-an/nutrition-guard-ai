@@ -1,47 +1,56 @@
-# Frontend Plan (Angular 18+)
+# Frontend Structure (Commit Scope 1)
 
-## Recommended App Structure
+This commit keeps a professional frontend folder layout while focusing on the highest-priority pages.
+
+## Structure
 
 ```text
 frontend/
-  src/app/
-    core/
-      services/
-        api.service.ts
-        auth.service.ts
-        health-state.service.ts    # Angular Signals source of truth
-    features/
-      landing/
-      auth/
-      profile-setup/
-      bmi-calculator/
-      nutrition-plan/
-      daily-meal-plan/
-      food-search/
-      progress-tracking/
-      vitamin-chat/
+  src/
+    index.html
     shared/
-      components/
-      models/
-      guards/
+      assets/
+        styles.css
+    pages/
+      landing.html                # Completed
+      auth/
+        login.html                # Completed
+        signup.html               # Completed
+      profile/
+        profile-setup.html        # Completed
+      placeholders/
+        dashboard.html
+        bmi-calculator.html
+        nutrition-plan.html
+        daily-meal-plan.html
+        progress-tracking.html
+        ai-chat-assistant.html
+        food-search.html
+        notifications.html
 ```
 
-## Signals State Core
-- `currentWeight` signal
-- `conditions` signal
-- `calorieGoal` signal
-- derived/computed signals for sodium/sugar/cholesterol limits
+## Completed In This Phase
+- Landing page
+- Login page
+- Signup page
+- Profile Setup page
 
-## Page to Backend API Mapping
-- Login/Register -> `/api/auth/*`
-- Profile Setup -> `PUT /api/profile`
-- BMI Calculator -> `POST /api/calculate/targets`
-- Nutrition Plan/Daily Meal -> `GET /api/meal-plan/daily`
-- Food Search (traffic light) -> `GET /api/foods/search`
-- Progress charts -> `/api/progress/*`
-- Vitamin bubble chat -> `POST /api/chat/ask` or `WS /api/chat/ws`
+## Placeholder In This Phase
+- Dashboard
+- BMI Calculator
+- Nutrition Plan
+- Daily Meal Plan
+- Progress Tracking
+- AI Chat Assistant
+- Food Search
+- Notifications
 
-## PWA
-- Use `ng add @angular/pwa`
-- Cache food search + meal plan views for offline-first behavior
-- Queue daily logs offline and sync when connectivity returns
+## Run Locally
+From project root:
+
+```powershell
+cd frontend/src
+python -m http.server 5173
+```
+
+Open: `http://localhost:5173`
