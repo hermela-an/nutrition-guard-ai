@@ -8,6 +8,8 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { BmiCalculatorComponent } from './features/bmi/bmi-calculator.component';
 import { NutritionPlanComponent } from './features/nutrition-plan/nutrition-plan.component';
 import { PlaceholderComponent } from './features/placeholder/placeholder.component';
+import { DailyMealPlanComponent } from './features/daily-meal-plan/daily-meal-plan.component';
+import { ProgressTrackingComponent } from './features/progress-tracking/progress-tracking.component';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
@@ -17,8 +19,8 @@ export const routes: Routes = [
   { path: 'profile-setup', component: ProfileSetupComponent, canActivate: [authGuard] },
   { path: 'bmi-calculator', component: BmiCalculatorComponent, canActivate: [authGuard] },
   { path: 'nutrition-plan', component: NutritionPlanComponent, canActivate: [authGuard] },
-  { path: 'daily-meal-plan', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Daily Meal Plan' } },
-  { path: 'progress-tracking', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Progress Tracking' } },
+  { path: 'daily-meal-plan', component: DailyMealPlanComponent, canActivate: [authGuard] },
+  { path: 'progress-tracking', component: ProgressTrackingComponent, canActivate: [authGuard] },
   { path: 'ai-chat-assistant', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'AI Chat Assistant' } },
   { path: 'food-search', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Food Search' } },
   { path: 'notifications', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Notifications' } },

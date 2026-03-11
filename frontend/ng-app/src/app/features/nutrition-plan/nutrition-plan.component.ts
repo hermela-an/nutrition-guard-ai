@@ -50,11 +50,11 @@ interface ProgressData {
     <div class="error-banner" *ngIf="error" [innerHTML]="error"></div>
     
     <div *ngIf="!loading && !error && targets" class="plan-container">
-      <!-- Header -->
       <div class="plan-header">
-        <div>
+        <div class="title-block">
+          <span class="eyebrow">Personalized plan</span>
           <h2>Nutrition Plan</h2>
-          <p class="muted">Your personalized nutrition targets based on profile, goal, and health conditions</p>
+          <p class="muted">Built from your profile, goal, and health conditions.</p>
         </div>
         <div class="plan-actions">
           <a class="btn secondary" routerLink="/profile-setup">Update Profile</a>
@@ -68,25 +68,29 @@ interface ProgressData {
         <div class="summary-card">
           <div class="summary-value">{{ targets.target_calories | number:'1.0-0' }}</div>
           <div class="summary-label">Target Calories</div>
-          <div class="muted" style="font-size: 11px; margin-top: 4px;">Daily Goal</div>
+          <div class="muted summary-sub">Daily goal</div>
         </div>
         <div class="summary-card">
           <div class="summary-value">{{ targets.bmi | number:'1.1-1' }}</div>
           <div class="summary-label">BMI</div>
-          <div class="muted" style="font-size: 11px; margin-top: 4px;" [style.color]="bmiCategory.color">{{ bmiCategory.text }}</div>
+          <div class="muted summary-sub" [style.color]="bmiCategory.color">{{ bmiCategory.text }}</div>
         </div>
         <div class="summary-card">
           <div class="summary-value">{{ targets.tdee | number:'1.0-0' }}</div>
           <div class="summary-label">Estimated TDEE</div>
-          <div class="muted" style="font-size: 11px; margin-top: 4px;">Maintenance</div>
+          <div class="muted summary-sub">Maintenance</div>
         </div>
         <div class="summary-card">
           <div class="summary-value">{{ targets.bmr | number:'1.0-0' }}</div>
           <div class="summary-label">Basal Metabolic Rate</div>
-          <div class="muted" style="font-size: 11px; margin-top: 4px;">At Rest</div>
+          <div class="muted summary-sub">At rest</div>
         </div>
       </div>
 
+      <div class="section-header">
+        <h3>Macro Targets</h3>
+        <span class="muted">Balanced to your goal</span>
+      </div>
       <!-- Macro Breakdown -->
       <div class="macro-breakdown">
         <div class="macro-card" *ngFor="let macro of macros">
@@ -99,11 +103,15 @@ interface ProgressData {
           </div>
           <div class="macro-details">
             <span>{{ macro.calories }} cal</span>
-            <span>{{ macro.percentage }}%</span>
+            <span title="Percent of target calories">{{ macro.percentage }}%</span>
           </div>
         </div>
       </div>
 
+      <div class="section-header">
+        <h3>Guidelines</h3>
+        <span class="muted">Based on medical constraints and goal</span>
+      </div>
       <!-- Constraints -->
       <div class="constraints-grid">
         <div class="constraint-card">
@@ -121,10 +129,17 @@ interface ProgressData {
         </div>
       </div>
 
+      <div class="section-header">
+        <h3>Meal Suggestions</h3>
+        <span class="muted">Quick ideas to get started</span>
+      </div>
       <!-- Meal Suggestions -->
       <div class="meal-suggestions">
         <div class="meal-card" *ngFor="let meal of mealSuggestions">
-          <div class="meal-title">{{ meal.emoji }} {{ meal.meal }}</div>
+          <div class="meal-title">
+            <span class="meal-icon" aria-hidden="true">{{ meal.emoji }}</span>
+            <span>{{ meal.meal }}</span>
+          </div>
           <ul class="meal-list">
             <li *ngFor="let item of meal.items">{{ item }}</li>
           </ul>
@@ -133,7 +148,10 @@ interface ProgressData {
 
       <!-- Progress Tracking -->
       <div class="progress-section">
-        <h3 style="margin-bottom: 12px;">Daily Progress</h3>
+        <div class="section-header">
+          <h3>Daily Progress</h3>
+          <span class="muted">Today vs targets</span>
+        </div>
         <div class="progress-grid">
           <div class="progress-card">
             <div class="progress-header">
@@ -223,6 +241,20 @@ interface ProgressData {
       margin-bottom: 16px;
     }
     
+    .title-block h2 {
+      font-size: 28px;
+      line-height: 1.1;
+      margin: 6px 0 6px;
+    }
+    
+    .eyebrow {
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 1.4px;
+      color: #7a8a7c;
+      font-weight: 700;
+    }
+    
     .plan-container {
       animation: fadeIn 0.3s ease-in;
     }
@@ -251,6 +283,28 @@ interface ProgressData {
       grid-template-columns: repeat(4, 1fr);
       gap: 12px;
       margin-bottom: 16px;
+    }
+    
+    .summary-sub {
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 22px 0 10px;
+    }
+    
+    .section-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    
+    .section-header .muted {
+      font-size: 12px;
     }
     
     .summary-card {
@@ -401,6 +455,17 @@ interface ProgressData {
       gap: 8px;
     }
     
+    .meal-icon {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #f4f7f3;
+      font-size: 16px;
+    }
+    
     .meal-list {
       list-style: none;
       padding: 0;
@@ -508,6 +573,18 @@ interface ProgressData {
       
       .plan-actions {
         justify-content: flex-start;
+      }
+    }
+    
+    @media (max-width: 640px) {
+      .plan-summary {
+        grid-template-columns: 1fr;
+      }
+      
+      .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
       }
     }
   `]
