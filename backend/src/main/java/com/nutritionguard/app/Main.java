@@ -15,6 +15,17 @@ public class Main {
     AppConfig config = AppConfig.fromEnv();
     Database database = new Database(vertx, config);
 
+    System.out.printf(
+      "Config: APP_PORT=%d DB_HOST=%s DB_PORT=%d DB_NAME=%s DB_SCHEMA=%s DB_USER=%s ENV_FILE=%s%n",
+      config.httpPort(),
+      config.dbHost(),
+      config.dbPort(),
+      config.dbName(),
+      config.dbSchema(),
+      config.dbUser(),
+      AppConfig.loadedEnvFile()
+    );
+
     database.ping()
       .compose(ok -> vertx.deployVerticle(new AuthVerticle(database, config)))
       .compose(ok -> vertx.deployVerticle(new CalculationVerticle()))

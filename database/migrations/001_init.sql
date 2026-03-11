@@ -48,3 +48,4 @@ CREATE TABLE IF NOT EXISTS daily_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_logs_user_date ON daily_logs (user_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_profiles_health_metadata ON profiles USING GIN (health_metadata);
