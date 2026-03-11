@@ -9,6 +9,8 @@ import io.vertx.core.json.JsonObject;
 public class AuthService {
   private final UserRepository users;
   private final JwtService jwt;
+  private static final int MIN_PASSWORD_LENGTH = 6;
+  private static final String EMAIL_PATTERN = "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$";
 
   public AuthService(UserRepository users, JwtService jwt) {
     this.users = users;
@@ -16,11 +18,19 @@ public class AuthService {
   }
 
   public Future<JsonObject> register(String email, String password) {
-    return users.findByEmail(email).compose(existing -> {
+    String normalizedEmail = normalizeEmail(email);
+    if (!isValidEmail(normalizedEmail)) {
+      return Future.failedFuture("Invalid email format");
+    }
+    if (!isValidPassword(password)) {
+      return Future.failedFuture("Password must be at least 6 characters");
+    }
+
+    return users.findByEmail(normalizedEmail).compose(existing -> {
       if (existing != null) {
         return Future.failedFuture("Email already exists");
       }
-      return users.createUser(email, HashUtil.hashPassword(password))
+      return users.createUser(normalizedEmail, HashUtil.hashPassword(password))
         .map(user -> {
           String token = jwt.issueToken(user.getString("id"), user.getString("email"));
           return new JsonObject().put("user", user).put("token", token);
@@ -29,7 +39,8 @@ public class AuthService {
   }
 
   public Future<JsonObject> login(String email, String password) {
-    return users.findByEmail(email).compose(existing -> {
+    String normalizedEmail = normalizeEmail(email);
+    return users.findByEmail(normalizedEmail).compose(existing -> {
       if (existing == null) {
         return Future.failedFuture("Invalid credentials");
       }
@@ -43,5 +54,23 @@ public class AuthService {
         .put("email", existing.getString("email"));
       return Future.succeededFuture(new JsonObject().put("user", user).put("token", token));
     });
+  }
+
+  private String normalizeEmail(String email) {
+    if (email == null) {
+      return "";
+    }
+    return email.trim().toLowerCase();
+  }
+
+  private boolean isValidEmail(String email) {
+    if (email == null || email.isBlank()) {
+      return false;
+    }
+    return email.toUpperCase().matches(EMAIL_PATTERN);
+  }
+
+  private boolean isValidPassword(String password) {
+    return password != null && password.trim().length() >= MIN_PASSWORD_LENGTH;
   }
 }

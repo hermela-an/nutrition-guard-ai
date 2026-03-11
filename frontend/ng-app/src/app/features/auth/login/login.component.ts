@@ -19,11 +19,16 @@ import { AuthService } from '../../../core/services/auth.service';
         <h2>Login</h2>
         <p class="lead">Secure access to your profile.</p>
         <form [formGroup]="form" (ngSubmit)="submit()">
-          <div class="field"><label>Email</label><input class="input auth-credential" formControlName="email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+          <div class="field">
+            <label>Email</label>
+            <input class="input auth-credential" [class.invalid]="isInvalid('email')" formControlName="email" type="email" autocomplete="email" placeholder="you@example.com">
+            <small class="error" *ngIf="showError('email', 'required')">Email is required.</small>
+            <small class="error" *ngIf="showError('email', 'email')">Invalid email format.</small>
+          </div>
           <div class="field">
             <label>Password</label>
             <div class="spaced" style="align-items:stretch;">
-              <input class="input auth-credential" formControlName="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="********">
+              <input class="input auth-credential" [class.invalid]="isInvalid('password')" formControlName="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="********">
               <button
                 class="icon-btn"
                 type="button"
@@ -40,7 +45,8 @@ import { AuthService } from '../../../core/services/auth.service';
                 </svg>
               </button>
             </div>
-            <small class="muted">Password must be at least 6 characters.</small>
+            <small class="error" *ngIf="showError('password', 'required')">Password is required.</small>
+            <small class="error" *ngIf="showError('password', 'minlength')">Password must be at least 6 characters.</small>
           </div>
           <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">Login</button>
         </form>
@@ -49,7 +55,20 @@ import { AuthService } from '../../../core/services/auth.service';
       </div>
     </section>
   </main>
-  `
+  `,
+  styles: [`
+    .input.invalid {
+      border-color: #d64545;
+      box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.12);
+    }
+
+    .error {
+      display: block;
+      font-size: 12px;
+      color: #d64545;
+      margin-top: 6px;
+    }
+  `]
 })
 export class LoginComponent {
   loading = false;
@@ -68,6 +87,16 @@ export class LoginComponent {
 
   togglePassword(): void {
     this.showPassword = !this.showPassword;
+  }
+
+  isInvalid(name: 'email' | 'password'): boolean {
+    const control = this.form.get(name);
+    return !!control && control.invalid && (control.dirty || control.touched);
+  }
+
+  showError(name: 'email' | 'password', error: string): boolean {
+    const control = this.form.get(name);
+    return !!control && (control.dirty || control.touched) && !!control.getError(error);
   }
 
   submit(): void {
