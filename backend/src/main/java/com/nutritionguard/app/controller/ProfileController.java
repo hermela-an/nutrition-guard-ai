@@ -1,6 +1,7 @@
 package com.nutritionguard.app.controller;
 
 import com.nutritionguard.app.service.ProfileService;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 
 public class ProfileController {
@@ -16,10 +17,11 @@ public class ProfileController {
       profiles.getProfile(userId)
         .onSuccess(profile -> {
           if (profile == null) {
-            ctx.response().setStatusCode(404).end("Profile not found");
-          } else {
-            ctx.response().putHeader("Content-Type", "application/json").end(profile.encode());
+            // Return empty JSON to avoid noisy 404s for new users.
+            ctx.response().putHeader("Content-Type", "application/json").end(new JsonObject().encode());
+            return;
           }
+          ctx.response().putHeader("Content-Type", "application/json").end(profile.encode());
         })
         .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     });

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { ProfilePayload, ProfileService } from '../../core/services/profile.service';
 import { ApiService } from '../../core/services/api.service';
 import { AppShellComponent } from '../../shared/components/app-shell.component';
-import { TimeoutError } from 'rxjs';
+import { EMPTY, TimeoutError } from 'rxjs';
 import { finalize, map, switchMap, timeout } from 'rxjs/operators';
 
 interface TargetResponse {
@@ -555,6 +555,13 @@ export class NutritionPlanComponent implements OnInit {
     this.profileService.getProfile().pipe(
       timeout(5_000),
       switchMap((profile) => {
+        if (!profile || !(profile as { user_id?: string }).user_id) {
+          this.targets = null;
+          this.error = '';
+          this.loading = false;
+          this.cdr.detectChanges();
+          return EMPTY;
+        }
         console.log('[NutritionPlan] profile ok', profile);
         const payload = this.toTargetsPayload(profile);
         return this.api.post<TargetResponse>('/api/calculate/targets', payload).pipe(
