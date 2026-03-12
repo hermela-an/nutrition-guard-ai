@@ -1,12 +1,18 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AppShellComponent } from '../../shared/components/app-shell.component';
+import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ProfileService } from '../../core/services/profile.service';
+import { finalize, map, switchMap, timeout } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 
 interface MealItem {
   name: string;
   portion: string;
   calories: number;
+  traffic_light?: string;
 }
 
 interface MealBlock {
@@ -16,11 +22,25 @@ interface MealBlock {
   items: MealItem[];
 }
 
+interface MealPlanResponse {
+  goal?: string;
+  breakfast: MealItem[];
+  lunch: MealItem[];
+  dinner: MealItem[];
+  snacks?: MealItem[];
+}
+
 @Component({
   standalone: true,
   imports: [CommonModule, RouterLink, AppShellComponent],
   template: `
   <app-shell [items]="menuItems">
+    <div class="loading-overlay" *ngIf="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="error-banner" *ngIf="error">{{ error }}</div>
+
     <div class="page-header">
       <div>
         <span class="eyebrow">Daily planner</span>
@@ -33,7 +53,7 @@ interface MealBlock {
       </div>
     </div>
 
-    <div class="summary-grid">
+    <div class="summary-grid" *ngIf="!loading && !error">
       <div class="summary-card">
         <div class="summary-label">Target Calories</div>
         <div class="summary-value">{{ totals.targetCalories | number:'1.0-0' }}</div>
@@ -56,12 +76,12 @@ interface MealBlock {
       </div>
     </div>
 
-    <div class="section-header">
+    <div class="section-header" *ngIf="!loading && !error">
       <h3>Meal Schedule</h3>
       <span class="muted">Portions and targets by time</span>
     </div>
 
-    <div class="meal-grid">
+    <div class="meal-grid" *ngIf="!loading && !error">
       <article class="meal-card" *ngFor="let meal of meals">
         <div class="meal-header">
           <div>
@@ -85,12 +105,16 @@ interface MealBlock {
       </article>
     </div>
 
-    <div class="section-header">
+    <div class="empty-card" *ngIf="!loading && !error && meals.length === 0">
+      <p class="muted">No meal suggestions yet. Update your profile or try again.</p>
+    </div>
+
+    <div class="section-header" *ngIf="!loading && !error">
       <h3>Daily Progress</h3>
       <span class="muted">Planned vs target calories</span>
     </div>
 
-    <div class="progress-card">
+    <div class="progress-card" *ngIf="!loading && !error">
       <div class="progress-header">
         <span class="label">Calories</span>
         <span class="value">{{ totals.plannedCalories | number:'1.0-0' }} / {{ totals.targetCalories | number:'1.0-0' }}</span>
@@ -109,6 +133,42 @@ interface MealBlock {
       align-items: flex-start;
       gap: 20px;
       margin-bottom: 18px;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e8f0e6;
+      border-top: 4px solid var(--brand);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error-banner {
+      background: #fde8e8;
+      border: 1px solid #f2c0c0;
+      color: #8e2f2f;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 16px;
     }
 
     .eyebrow {
@@ -262,6 +322,14 @@ interface MealBlock {
       color: var(--muted);
     }
 
+    .empty-card {
+      background: #fff;
+      border: 1px dashed #d8dfcf;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
     .progress-card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -333,6 +401,14 @@ interface MealBlock {
   `]
 })
 export class DailyMealPlanComponent {
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
+  private readonly profiles = inject(ProfileService);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  loading = true;
+  error = '';
+
   menuItems = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Profile Setup', path: '/profile-setup' },
@@ -345,48 +421,85 @@ export class DailyMealPlanComponent {
     { label: 'Notifications', path: '/notifications' }
   ];
 
-  meals: MealBlock[] = [
-    {
-      title: 'Breakfast',
-      time: '07:30',
-      targetCalories: 520,
-      items: [
-        { name: 'Greek yogurt bowl', portion: '1 bowl', calories: 220 },
-        { name: 'Whole-grain toast', portion: '2 slices', calories: 180 },
-        { name: 'Mixed berries', portion: '1 cup', calories: 120 }
-      ]
-    },
-    {
-      title: 'Lunch',
-      time: '12:45',
-      targetCalories: 680,
-      items: [
-        { name: 'Grilled chicken salad', portion: '1 plate', calories: 340 },
-        { name: 'Quinoa side', portion: '3/4 cup', calories: 220 },
-        { name: 'Olive oil dressing', portion: '1 tbsp', calories: 120 }
-      ]
-    },
-    {
-      title: 'Dinner',
-      time: '19:00',
-      targetCalories: 700,
-      items: [
-        { name: 'Baked salmon', portion: '150 g', calories: 320 },
-        { name: 'Roasted vegetables', portion: '2 cups', calories: 180 },
-        { name: 'Brown rice', portion: '1 cup', calories: 200 }
-      ]
-    }
-  ];
+  meals: MealBlock[] = [];
 
   totals = {
-    targetCalories: 2100,
-    plannedCalories: 1900,
-    protein: 135,
+    targetCalories: 0,
+    plannedCalories: 0,
+    protein: 0,
     waterLiters: 2.5
   };
 
   get progressPercentage(): number {
+    if (this.totals.targetCalories <= 0) return 0;
     return Math.min(100, Math.round((this.totals.plannedCalories / this.totals.targetCalories) * 100));
   }
-}
 
+  constructor() {
+    this.loadPlan();
+  }
+
+  private loadPlan(): void {
+    this.loading = true;
+    this.error = '';
+
+    this.profiles.getProfile().pipe(
+      timeout(5_000),
+      switchMap((profile) => {
+        if (!profile || !(profile as { user_id?: string }).user_id) {
+          throw new Error('Profile not found. Please complete Profile Setup first.');
+        }
+        return forkJoin({
+          targets: this.api.post<{ target_calories: number }>('/api/calculate/targets', {
+            age: Number(profile.age),
+            gender: profile.gender,
+            height_cm: Number(profile.height_cm),
+            weight_kg: Number(profile.weight_kg),
+            activity_level: profile.activity_level,
+            goal: profile.goal
+          }).pipe(timeout(5_000)),
+          plan: this.api.get<MealPlanResponse>('/api/meal-plan/daily', this.auth.authHeaders()).pipe(timeout(5_000))
+        });
+      }),
+      map(({ targets, plan }) => ({ targets, plan })),
+      finalize(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: ({ targets, plan }) => {
+        this.totals.targetCalories = Math.round(targets.target_calories ?? 0);
+
+        this.meals = [
+          this.toMeal('Breakfast', '07:30', plan.breakfast ?? []),
+          this.toMeal('Lunch', '12:45', plan.lunch ?? []),
+          this.toMeal('Dinner', '19:00', plan.dinner ?? [])
+        ];
+
+        this.totals.plannedCalories = this.meals.reduce((sum, meal) => sum + meal.targetCalories, 0);
+        this.totals.protein = 0;
+      },
+      error: (err) => {
+        this.error = typeof err?.message === 'string' ? err.message : 'Failed to load daily meal plan.';
+      }
+    });
+  }
+
+  private toMeal(title: string, time: string, items: MealItem[]): MealBlock {
+    const normalized = items.map((item) => ({
+      name: item.name,
+      portion: item.portion ?? '1 serving',
+      calories: Number(item.calories ?? 0),
+      traffic_light: item.traffic_light
+    }));
+
+    const targetCalories = normalized.reduce((sum, item) => sum + item.calories, 0);
+
+    return {
+      title,
+      time,
+      targetCalories,
+      items: normalized
+    };
+  }
+}

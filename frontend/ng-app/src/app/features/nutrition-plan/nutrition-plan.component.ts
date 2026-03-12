@@ -4,7 +4,8 @@ import { RouterLink } from '@angular/router';
 import { ProfilePayload, ProfileService } from '../../core/services/profile.service';
 import { ApiService } from '../../core/services/api.service';
 import { AppShellComponent } from '../../shared/components/app-shell.component';
-import { EMPTY, TimeoutError } from 'rxjs';
+import { AuthService } from '../../core/services/auth.service';
+import { EMPTY, TimeoutError, forkJoin } from 'rxjs';
 import { finalize, map, switchMap, timeout } from 'rxjs/operators';
 
 interface TargetResponse {
@@ -31,6 +32,20 @@ interface MealSuggestion {
   meal: string;
   items: string[];
   emoji: string;
+}
+
+interface MealPlanItem {
+  name: string;
+  calories: number;
+  traffic_light?: string;
+}
+
+interface MealPlanResponse {
+  goal?: string;
+  breakfast: MealPlanItem[];
+  lunch: MealPlanItem[];
+  dinner: MealPlanItem[];
+  snacks?: MealPlanItem[];
 }
 
 interface ProgressData {
@@ -592,6 +607,7 @@ interface ProgressData {
 export class NutritionPlanComponent implements OnInit {
   private readonly profileService = inject(ProfileService);
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   loading = true;
@@ -641,10 +657,10 @@ export class NutritionPlanComponent implements OnInit {
         }
         console.log('[NutritionPlan] profile ok', profile);
         const payload = this.toTargetsPayload(profile);
-        return this.api.post<TargetResponse>('/api/calculate/targets', payload).pipe(
-          timeout(5_000),
-          map((res) => ({ profile, res }))
-        );
+        return forkJoin({
+          targets: this.api.post<TargetResponse>('/api/calculate/targets', payload).pipe(timeout(5_000)),
+          mealPlan: this.api.get<MealPlanResponse>('/api/meal-plan/daily', this.auth.authHeaders()).pipe(timeout(5_000))
+        }).pipe(map(({ targets, mealPlan }) => ({ profile, targets, mealPlan })));
       }),
       finalize(() => {
         this.loading = false;
@@ -652,17 +668,17 @@ export class NutritionPlanComponent implements OnInit {
         this.cdr.detectChanges();
       })
     ).subscribe({
-      next: ({ profile, res }) => {
+      next: ({ profile, targets, mealPlan }) => {
         // Redundant with `finalize`, but keeps UI responsive even if downstream code throws.
         this.loading = false;
-        console.log('[NutritionPlan] targets ok', res);
+        console.log('[NutritionPlan] targets ok', targets);
         try {
-          this.targets = res;
-          this.applyBmiCategory(res.bmi);
-          this.macros = this.buildMacros(res.target_calories, profile.goal);
+          this.targets = targets;
+          this.applyBmiCategory(targets.bmi);
+          this.macros = this.buildMacros(targets.target_calories, profile.goal);
           this.constraints = this.buildConstraints(profile.health_metadata ?? {}, profile.goal);
-          this.mealSuggestions = this.buildMealSuggestions(profile.goal);
-          this.progress.calories.target = res.target_calories;
+          this.mealSuggestions = this.buildMealSuggestionsFromPlan(mealPlan);
+          this.progress.calories.target = targets.target_calories;
           this.cdr.detectChanges();
         } catch (e) {
           this.targets = null;
@@ -720,6 +736,17 @@ export class NutritionPlanComponent implements OnInit {
     }
 
     return 'Failed to load nutrition plan. Please try again.';
+  }
+
+  private buildMealSuggestionsFromPlan(plan: MealPlanResponse): MealSuggestion[] {
+    const toItems = (items: MealPlanItem[] | undefined) =>
+      (items ?? []).map((item) => `${item.name} · ${item.calories} cal`);
+
+    return [
+      { meal: 'Breakfast', emoji: '🍳', items: toItems(plan.breakfast) },
+      { meal: 'Lunch', emoji: '🥗', items: toItems(plan.lunch) },
+      { meal: 'Dinner', emoji: '🍽️', items: toItems(plan.dinner) }
+    ];
   }
 
   private buildMacros(calories: number, goal: string): MacroTarget[] {

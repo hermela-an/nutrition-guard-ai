@@ -16,6 +16,9 @@ public class FilterService {
 
   public Future<JsonObject> generateMealPlan(JsonObject profile) {
     JsonObject health = profile.getJsonObject("health_metadata", new JsonObject());
+    String goal = profile.getString("goal", "").toLowerCase();
+    boolean preferHighCalories = "weight_gain".equals(goal);
+    boolean preferLowCalories = "weight_loss".equals(goal);
     return CompositeFuture.all(
       foods.mealCandidates("breakfast"),
       foods.mealCandidates("lunch"),
@@ -23,17 +26,31 @@ public class FilterService {
       foods.mealCandidates("snack")
     ).map(cf -> {
       JsonObject response = new JsonObject();
-      response.put("breakfast", pickSafe(cf.resultAt(0), health));
-      response.put("lunch", pickSafe(cf.resultAt(1), health));
-      response.put("dinner", pickSafe(cf.resultAt(2), health));
-      response.put("snacks", pickSafe(cf.resultAt(3), health));
+      response.put("goal", goal);
+      response.put("breakfast", pickSafe(cf.resultAt(0), health, preferHighCalories, preferLowCalories));
+      response.put("lunch", pickSafe(cf.resultAt(1), health, preferHighCalories, preferLowCalories));
+      response.put("dinner", pickSafe(cf.resultAt(2), health, preferHighCalories, preferLowCalories));
+      response.put("snacks", pickSafe(cf.resultAt(3), health, preferHighCalories, preferLowCalories));
       return response;
     });
   }
 
-  private JsonArray pickSafe(JsonArray input, JsonObject health) {
+  private JsonArray pickSafe(JsonArray input, JsonObject health, boolean preferHigh, boolean preferLow) {
     JsonArray safe = new JsonArray();
-    for (int i = 0; i < input.size() && safe.size() < 3; i++) {
+    int start = 0;
+    int end = input.size() - 1;
+    int step = 1;
+
+    if (preferHigh && !preferLow) {
+      start = end;
+      end = 0;
+      step = -1;
+    }
+
+    for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+      if (safe.size() >= 3) {
+        break;
+      }
       JsonObject item = input.getJsonObject(i);
       String light = TrafficLightUtil.evaluate(health, item);
       if (!"RED".equals(light)) {
