@@ -74,7 +74,6 @@ interface ProgressData {
         <div class="plan-actions">
           <a class="btn secondary" routerLink="/profile-setup">Update Profile</a>
           <a class="btn primary" routerLink="/daily-meal-plan">Daily Meal Plan</a>
-          <a class="btn ghost" routerLink="/ai-chat-assistant">AI Nutrition Assistant</a>
         </div>
       </div>
 
@@ -202,7 +201,6 @@ interface ProgressData {
       <div class="action-buttons">
         <a class="btn primary" routerLink="/food-search">Search Foods</a>
         <a class="btn secondary" routerLink="/progress-tracking">Track Progress</a>
-        <a class="btn ghost" routerLink="/ai-chat-assistant">Get AI Advice</a>
       </div>
     </div>
 
@@ -630,7 +628,6 @@ export class NutritionPlanComponent implements OnInit {
     { label: 'Nutrition Plan', path: '/nutrition-plan' },
     { label: 'Daily Meal Plan', path: '/daily-meal-plan' },
     { label: 'Progress Tracking', path: '/progress-tracking' },
-    { label: 'AI Chat Assistant', path: '/ai-chat-assistant' },
     { label: 'Food Search', path: '/food-search' },
     { label: 'Notifications', path: '/notifications' }
   ];

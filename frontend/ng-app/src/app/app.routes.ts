@@ -1,4 +1,4 @@
-﻿import { Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { LandingComponent } from './features/landing/landing.component';
 import { LoginComponent } from './features/auth/login/login.component';
@@ -10,6 +10,7 @@ import { NutritionPlanComponent } from './features/nutrition-plan/nutrition-plan
 import { PlaceholderComponent } from './features/placeholder/placeholder.component';
 import { DailyMealPlanComponent } from './features/daily-meal-plan/daily-meal-plan.component';
 import { ProgressTrackingComponent } from './features/progress-tracking/progress-tracking.component';
+import { FoodSearchComponent } from './features/food-search/food-search.component';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
@@ -21,8 +22,7 @@ export const routes: Routes = [
   { path: 'nutrition-plan', component: NutritionPlanComponent, canActivate: [authGuard] },
   { path: 'daily-meal-plan', component: DailyMealPlanComponent, canActivate: [authGuard] },
   { path: 'progress-tracking', component: ProgressTrackingComponent, canActivate: [authGuard] },
-  { path: 'ai-chat-assistant', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'AI Chat Assistant' } },
-  { path: 'food-search', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Food Search' } },
+  { path: 'food-search', component: FoodSearchComponent, canActivate: [authGuard] },
   { path: 'notifications', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Notifications' } },
   { path: '**', redirectTo: '' }
 ];

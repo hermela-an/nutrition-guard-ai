@@ -2,6 +2,7 @@ import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { FloatingChatComponent } from './floating-chat.component';
 
 interface MenuItem {
   label: string;
@@ -11,7 +12,7 @@ interface MenuItem {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterLink, RouterLinkActive, FloatingChatComponent],
   template: `
     <div class="app-shell">
       <aside class="sidebar">
@@ -26,6 +27,9 @@ interface MenuItem {
       <main class="main">
         <ng-content></ng-content>
       </main>
+
+      <!-- Global AI Chat Assistant -->
+      <app-floating-chat></app-floating-chat>
     </div>
   `
 })

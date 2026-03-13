@@ -1,4 +1,4 @@
-﻿import { Component, ElementRef, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -56,7 +56,6 @@ export class ProfileSetupComponent {
     { label: 'Nutrition Plan', path: '/nutrition-plan' },
     { label: 'Daily Meal Plan', path: '/daily-meal-plan' },
     { label: 'Progress Tracking', path: '/progress-tracking' },
-    { label: 'AI Chat Assistant', path: '/ai-chat-assistant' },
     { label: 'Food Search', path: '/food-search' },
     { label: 'Notifications', path: '/notifications' }
   ];

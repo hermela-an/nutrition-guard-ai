@@ -416,7 +416,6 @@ export class DailyMealPlanComponent {
     { label: 'Nutrition Plan', path: '/nutrition-plan' },
     { label: 'Daily Meal Plan', path: '/daily-meal-plan' },
     { label: 'Progress Tracking', path: '/progress-tracking' },
-    { label: 'AI Chat Assistant', path: '/ai-chat-assistant' },
     { label: 'Food Search', path: '/food-search' },
     { label: 'Notifications', path: '/notifications' }
   ];

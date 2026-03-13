@@ -1,0 +1,498 @@
+import { Component, ElementRef, inject, ViewChild, ChangeDetectorRef, AfterViewChecked } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+
+interface ChatMessage {
+  text: string;
+  isUser: boolean;
+  time: Date;
+  imageUrl?: string;
+}
+
+@Component({
+  selector: 'app-floating-chat',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <!-- Floating toggle button -->
+    <button class="chat-toggle-btn" (click)="toggleChat()" [class.active]="isOpen" aria-label="Toggle AI Assistant">
+      <svg *ngIf="!isOpen" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
+      </svg>
+      <svg *ngIf="isOpen" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    </button>
+
+    <!-- Chat Window -->
+    <div class="chat-window" [class.open]="isOpen">
+      <div class="chat-header">
+        <div class="chat-header-info">
+          <div class="chat-avatar">✨</div>
+          <div>
+            <h3>NutriGuard AI</h3>
+            <span class="status-indicator">Always online</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-body" #chatBody>
+        <!-- Welcome / placeholder if no messages exist -->
+        <div class="chat-empty-state" *ngIf="messages.length === 0">
+          <div class="empty-icon">👋</div>
+          <p>Hi there! I'm your personal nutrition assistant.</p>
+          <span class="muted">Ask me about your diet, meals, or vitamin suggestions.</span>
+          
+          <div class="suggestion-chips">
+            <button (click)="quickAsk('What are some good sources of iron?')">Iron sources</button>
+            <button (click)="quickAsk('How much water should I drink?')">Hydration</button>
+            <button (click)="quickAsk('Healthy snacks for late night?')">Late night snacks</button>
+          </div>
+        </div>
+
+        <div class="message-group" *ngFor="let msg of messages">
+          <div class="message" [class.user-msg]="msg.isUser" [class.ai-msg]="!msg.isUser">
+            <div class="message-bubble">
+              <span [innerHTML]="formatText(msg.text)"></span>
+              <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="chat-img" alt="Attached resource" loading="lazy">
+            </div>
+            <div class="message-time">{{ msg.time | date:'shortTime' }}</div>
+          </div>
+        </div>
+
+        <div class="typing-indicator" *ngIf="isTyping">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        <input 
+          type="text" 
+          [(ngModel)]="currentInput" 
+          (keyup.enter)="sendMessage()"
+          placeholder="Ask a nutrition question..." 
+          class="chat-input"
+          [disabled]="isTyping"
+        >
+        <button class="send-btn" (click)="sendMessage()" [disabled]="!currentInput.trim() || isTyping">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .chat-toggle-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 12px rgba(46, 159, 97, 0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
+    }
+
+    .chat-toggle-btn:hover {
+      transform: scale(1.05);
+      background: #25824e;
+    }
+
+    .chat-toggle-btn.active {
+      transform: rotate(90deg);
+      background: #475a4b;
+    }
+
+    .chat-window {
+      position: fixed;
+      bottom: 90px;
+      right: 24px;
+      width: 350px;
+      height: 500px;
+      max-height: calc(100vh - 120px);
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      z-index: 9998;
+      overflow: hidden;
+      
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .chat-window.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: all;
+    }
+
+    .chat-header {
+      background: #f4f7f3;
+      padding: 16px;
+      border-bottom: 1px solid #e6ede3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-avatar {
+      width: 36px;
+      height: 36px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .chat-header h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .status-indicator {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-indicator::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #2e9f61;
+      border-radius: 50%;
+    }
+
+    .chat-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #fafcf9;
+      scroll-behavior: smooth;
+    }
+
+    .chat-empty-state {
+      text-align: center;
+      margin: auto 0;
+      padding: 20px;
+    }
+
+    .empty-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .chat-empty-state p {
+      margin: 0 0 4px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .chat-empty-state .muted {
+      font-size: 12px;
+    }
+
+    .suggestion-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .suggestion-chips button {
+      background: white;
+      border: 1px solid #d8dfcf;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--brand);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .suggestion-chips button:hover {
+      background: #f4f7f3;
+      border-color: #2e9f61;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 85%;
+    }
+
+    .user-msg {
+      align-self: flex-end;
+    }
+
+    .ai-msg {
+      align-self: flex-start;
+    }
+
+    .message-bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+
+    .user-msg .message-bubble {
+      background: var(--brand);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .ai-msg .message-bubble {
+      background: white;
+      border: 1px solid #e6ede3;
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .chat-img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+      display: block;
+      border: 1px solid #e6ede3;
+      object-fit: cover;
+      max-height: 180px;
+    }
+
+    .message-time {
+      font-size: 10px;
+      color: #9aa89b;
+      margin-top: 4px;
+    }
+
+    .user-msg .message-time {
+      align-self: flex-end;
+    }
+
+    .chat-footer {
+      padding: 12px 16px;
+      background: white;
+      border-top: 1px solid #e6ede3;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: #f4f7f3;
+      border: 1px solid transparent;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .chat-input:focus {
+      border-color: #d8dfcf;
+      background: white;
+      box-shadow: 0 0 0 2px rgba(46, 159, 97, 0.1);
+    }
+
+    .chat-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .send-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: white;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      background: #25824e;
+    }
+
+    .send-btn:disabled {
+      background: #d8dfcf;
+      cursor: not-allowed;
+    }
+
+    /* Typing animation */
+    .typing-indicator {
+      align-self: flex-start;
+      background: white;
+      border: 1px solid #e6ede3;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border-bottom-left-radius: 4px;
+      display: flex;
+      gap: 4px;
+      width: fit-content;
+    }
+
+    .typing-indicator span {
+      width: 6px;
+      height: 6px;
+      background: #9aa89b;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    /* Mobile handling */
+    @media (max-width: 480px) {
+      .chat-window {
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+      }
+
+      .chat-toggle-btn.active {
+        display: none; /* Hide toggle when fullscreen */
+      }
+    }
+  `]
+})
+export class FloatingChatComponent implements AfterViewChecked {
+  @ViewChild('chatBody') private chatBody!: ElementRef;
+
+  private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  isOpen = false;
+  isTyping = false;
+  currentInput = '';
+  shouldScroll = false;
+
+  messages: ChatMessage[] = [];
+
+  ngAfterViewChecked(): void {
+    if (this.shouldScroll) {
+      this.scrollToBottom();
+      this.shouldScroll = false;
+    }
+  }
+
+  toggleChat(): void {
+    this.isOpen = !this.isOpen;
+    if (this.isOpen && this.messages.length > 0) {
+      this.shouldScroll = true;
+    }
+  }
+
+  quickAsk(question: string): void {
+    this.currentInput = question;
+    this.sendMessage();
+  }
+
+  sendMessage(): void {
+    const text = this.currentInput.trim();
+    if (!text || this.isTyping) return;
+
+    // Add user message to UI immediately
+    this.messages.push({
+      text: text,
+      isUser: true,
+      time: new Date()
+    });
+    
+    this.currentInput = '';
+    this.isTyping = true;
+    this.shouldScroll = true;
+
+    // Call REST endpoint mapped safely across Vert.x Event Bus
+    this.api.post<{ answer?: string, response?: string, imageUrl?: string, error?: string }>('/api/chat/ask', { question: text }, this.auth.authHeaders())
+      .subscribe({
+        next: (resp) => {
+          this.isTyping = false;
+          // Different bots return different payload properties, handle safely
+          const aiResponse = resp.answer || resp.response || "I'm sorry, I couldn't process that request at the moment.";
+          
+          this.messages.push({
+            text: aiResponse,
+            isUser: false,
+            time: new Date(),
+            imageUrl: resp.imageUrl
+          });
+          this.shouldScroll = true;
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.isTyping = false;
+          this.messages.push({
+            text: 'I lost connection to the server. Please check your backend and try again.',
+            isUser: false,
+            time: new Date()
+          });
+          this.shouldScroll = true;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  formatText(text: string): string {
+    if (!text) return '';
+    // Format basic markdown bolding
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  private scrollToBottom(): void {
+    try {
+      this.chatBody.nativeElement.scrollTop = this.chatBody.nativeElement.scrollHeight;
+    } catch (err) {}
+  }
+}
