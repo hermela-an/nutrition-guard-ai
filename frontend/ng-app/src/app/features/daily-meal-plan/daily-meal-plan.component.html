@@ -1,0 +1,93 @@
+
+  <app-shell [items]="menuItems">
+    <div class="loading-overlay" *ngIf="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">Daily planner</span>
+        <h2>Daily Meal Plan</h2>
+        <p class="muted">A structured plan with balanced portions and a clear calorie budget.</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn secondary" routerLink="/nutrition-plan">Back to Nutrition Plan</a>
+        <a class="btn primary" routerLink="/profile-setup">Update Profile</a>
+      </div>
+    </div>
+
+    <div class="summary-grid" *ngIf="!loading && !error">
+      <div class="summary-card">
+        <div class="summary-label">Target Calories</div>
+        <div class="summary-value">{{ totals.targetCalories | number:'1.0-0' }}</div>
+        <div class="summary-sub">Daily goal</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Planned Calories</div>
+        <div class="summary-value">{{ totals.plannedCalories | number:'1.0-0' }}</div>
+        <div class="summary-sub">Meals combined</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Protein Target</div>
+        <div class="summary-value">{{ totals.protein }}g</div>
+        <div class="summary-sub">Macro focus</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Hydration</div>
+        <div class="summary-value">{{ totals.waterLiters }}L</div>
+        <div class="summary-sub">Daily reminder</div>
+      </div>
+    </div>
+
+    <div class="section-header" *ngIf="!loading && !error">
+      <h3>Meal Schedule</h3>
+      <span class="muted">Portions and targets by time</span>
+    </div>
+
+    <div class="meal-grid" *ngIf="!loading && !error">
+      <article class="meal-card" *ngFor="let meal of meals">
+        <div class="meal-header">
+          <div>
+            <div class="meal-title">{{ meal.title }}</div>
+            <div class="meal-time">{{ meal.time }}</div>
+          </div>
+          <div class="meal-target">
+            <span class="label">Target</span>
+            <span class="value">{{ meal.targetCalories | number:'1.0-0' }} cal</span>
+          </div>
+        </div>
+        <ul class="meal-items">
+          <li *ngFor="let item of meal.items">
+            <div class="item-name">{{ item.name }}</div>
+            <div class="item-meta">
+              <span>{{ item.portion }}</span>
+              <span>{{ item.calories | number:'1.0-0' }} cal</span>
+            </div>
+          </li>
+        </ul>
+      </article>
+    </div>
+
+    <div class="empty-card" *ngIf="!loading && !error && meals.length === 0">
+      <p class="muted">No meal suggestions yet. Update your profile or try again.</p>
+    </div>
+
+    <div class="section-header" *ngIf="!loading && !error">
+      <h3>Daily Progress</h3>
+      <span class="muted">Planned vs target calories</span>
+    </div>
+
+    <div class="progress-card" *ngIf="!loading && !error">
+      <div class="progress-header">
+        <span class="label">Calories</span>
+        <span class="value">{{ totals.plannedCalories | number:'1.0-0' }} / {{ totals.targetCalories | number:'1.0-0' }}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width]="progressPercentage + '%'"></div>
+      </div>
+      <div class="progress-sub muted">Aim to stay within 5% of your target.</div>
+    </div>
+  </app-shell>
+  

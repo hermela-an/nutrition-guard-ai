@@ -1,0 +1,84 @@
+
+  <app-shell [items]="menuItems">
+    <div class="loading-overlay" *ngIf="loading">
+      <div class="spinner"></div>
+    </div>
+    <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+    <div *ngIf="!loading && !error">
+      <div class="page-header">
+        <div>
+          <span class="eyebrow">Progress insights</span>
+          <h2>Progress Tracking</h2>
+          <p class="muted">Monitor your weekly calories, hydration, and weight trends.</p>
+        </div>
+        <div class="header-actions">
+          <a class="btn secondary" routerLink="/nutrition-plan">Back to Nutrition Plan</a>
+          <a class="btn primary" routerLink="/profile-setup">Update Profile</a>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Weekly Avg Calories</div>
+          <div class="summary-value">{{ averages.calories | number:'1.0-0' }}</div>
+          <div class="summary-sub">Target {{ targets.calories | number:'1.0-0' }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Weekly Avg Water</div>
+          <div class="summary-value">{{ averages.water | number:'1.1-1' }}L</div>
+          <div class="summary-sub">Target {{ targets.water | number:'1.1-1' }}L</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Weight Trend</div>
+          <div class="summary-value" [ngClass]="{'positive': averages.weightDelta < 0, 'negative': averages.weightDelta > 0}">{{ averages.weightDelta > 0 ? '+' : '' }}{{ averages.weightDelta }} kg</div>
+          <div class="summary-sub">Last 7 days</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Consistency</div>
+          <div class="summary-value">{{ averages.consistency }}%</div>
+          <div class="summary-sub">Goal adherence</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h3>Weekly Overview</h3>
+        <span class="muted">Calories and water by day</span>
+      </div>
+
+      <div class="progress-grid">
+        <div class="progress-card" *ngFor="let point of weekly">
+          <div class="progress-day">{{ point.day }}</div>
+          <div class="progress-row">
+            <span class="label">Calories</span>
+            <span class="value">{{ point.calories | number:'1.0-0' }}</span>
+          </div>
+          <div class="bar">
+            <div class="fill calories" [style.width]="percent(point.calories, targets.calories) + '%'"></div>
+          </div>
+          <div class="progress-row">
+            <span class="label">Water</span>
+            <span class="value">{{ point.water | number:'1.1-1' }}L</span>
+          </div>
+          <div class="bar">
+            <div class="fill water" [style.width]="percent(point.water, targets.water) + '%'"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h3>Notes</h3>
+        <span class="muted">Quick guidance</span>
+      </div>
+
+      <div class="insight-card" *ngIf="averages.consistency >= 70">
+        <p><strong>Nice work:</strong> Your hydration and calorie consistency is excellent this week!</p>
+        <p class="muted">Keep up the great work to see steady progress towards your goals.</p>
+      </div>
+      <div class="insight-card caution-insight" *ngIf="averages.consistency < 70">
+        <p><strong>Keep it up:</strong> Tracking your daily intake more consistently will provide better insights.</p>
+        <p class="muted">Try to log your meals every day to build a stronger habit.</p>
+      </div>
+    </div>
+  </app-shell>
+  

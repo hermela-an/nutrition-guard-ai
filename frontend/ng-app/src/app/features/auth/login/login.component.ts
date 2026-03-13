@@ -7,68 +7,8 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
-  template: `
-  <main class="auth-wrap">
-    <section class="auth-shell">
-      <aside class="auth-side">
-        <a class="brand" routerLink="/" style="color:#fff;"><span class="brand-dot"></span> NutriGuard AI</a>
-        <h2 style="margin-top:30px;">Welcome back.</h2>
-        <p>Log in to access your medically-aware dashboard and nutrition plan.</p>
-      </aside>
-      <div class="auth-form">
-        <h2>Login</h2>
-        <p class="lead">Secure access to your profile.</p>
-        <form [formGroup]="form" (ngSubmit)="submit()">
-          <div class="field">
-            <label>Email</label>
-            <input class="input auth-credential" [class.invalid]="isInvalid('email')" formControlName="email" type="email" autocomplete="email" placeholder="you@example.com">
-            <small class="error" *ngIf="showError('email', 'required')">Email is required.</small>
-            <small class="error" *ngIf="showError('email', 'email')">Invalid email format.</small>
-          </div>
-          <div class="field">
-            <label>Password</label>
-            <div class="spaced" style="align-items:stretch;">
-              <input class="input auth-credential" [class.invalid]="isInvalid('password')" formControlName="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="********">
-              <button
-                class="icon-btn"
-                type="button"
-                (click)="togglePassword()"
-                [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
-                [title]="showPassword ? 'Hide password' : 'Show password'">
-                <svg *ngIf="!showPassword" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                  <path d="M1.5 12s4-7 10.5-7 10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                  <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                </svg>
-                <svg *ngIf="showPassword" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                  <path d="m3 3 18 18" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                  <path d="M10.6 6.4A11.7 11.7 0 0 1 12 6c6.5 0 10.5 6 10.5 6a16 16 0 0 1-4 4.9M6.1 9A16.9 16.9 0 0 0 1.5 12s4 7 10.5 7a10 10 0 0 0 4-.8" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                </svg>
-              </button>
-            </div>
-            <small class="error" *ngIf="showError('password', 'required')">Password is required.</small>
-            <small class="error" *ngIf="showError('password', 'minlength')">Password must be at least 6 characters.</small>
-          </div>
-          <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">Login</button>
-        </form>
-        <div *ngIf="status" class="status" [class.ok]="!error" [class.err]="error">{{ status }}</div>
-        <p style="margin-top:12px; color:var(--muted);">No account? <a routerLink="/signup" style="color:var(--brand); font-weight:700;">Sign up</a></p>
-      </div>
-    </section>
-  </main>
-  `,
-  styles: [`
-    .input.invalid {
-      border-color: #d64545;
-      box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.12);
-    }
-
-    .error {
-      display: block;
-      font-size: 12px;
-      color: #d64545;
-      margin-top: 6px;
-    }
-  `]
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.css']
 })
 export class LoginComponent {
   loading = false;

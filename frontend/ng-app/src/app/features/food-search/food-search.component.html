@@ -1,0 +1,163 @@
+
+  <app-shell [items]="menuItems">
+    <div class="loading-overlay" *ngIf="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">Smart lookup</span>
+        <h2>Food Search</h2>
+        <p class="muted">Find foods, compare macros, and see health-friendly signals instantly.</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn secondary" routerLink="/nutrition-plan">Back to Nutrition Plan</a>
+        <a class="btn primary" routerLink="/daily-meal-plan">Daily Meal Plan</a>
+      </div>
+    </div>
+
+    <div class="search-card">
+      <div class="search-bar">
+        <input
+          class="input"
+          type="text"
+          placeholder="Search foods, e.g. salmon, oats, lentils"
+          [(ngModel)]="query"
+          (keyup.enter)="runSearch()"
+          aria-label="Search foods"
+        />
+        <button class="btn primary" type="button" (click)="runSearch()">Search</button>
+      </div>
+      <div class="search-meta">
+        <div class="chip-row">
+          <button class="chip" [class.active]="mealFilter === 'all'" (click)="setMealFilter('all')">All meals</button>
+          <button class="chip" [class.active]="mealFilter === 'breakfast'" (click)="setMealFilter('breakfast')">Breakfast</button>
+          <button class="chip" [class.active]="mealFilter === 'lunch'" (click)="setMealFilter('lunch')">Lunch</button>
+          <button class="chip" [class.active]="mealFilter === 'dinner'" (click)="setMealFilter('dinner')">Dinner</button>
+          <button class="chip" [class.active]="mealFilter === 'snack'" (click)="setMealFilter('snack')">Snack</button>
+        </div>
+        <div class="sort-row">
+          <span class="muted">Sort by</span>
+          <button class="chip" [class.active]="sortMode === 'name'" (click)="setSort('name')">Name</button>
+          <button class="chip" [class.active]="sortMode === 'calories'" (click)="setSort('calories')">Calories</button>
+          <button class="chip" [class.active]="sortMode === 'protein'" (click)="setSort('protein')">Protein</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-grid" *ngIf="!loading && !error">
+      <div class="summary-card">
+        <div class="summary-label">Results</div>
+        <div class="summary-value">{{ filteredFoods.length }}</div>
+        <div class="summary-sub">Foods found</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Avg Calories</div>
+        <div class="summary-value">{{ averages.calories | number:'1.0-0' }}</div>
+        <div class="summary-sub">Per item</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Safety Mix</div>
+        <div class="summary-value">{{ safety.safe }} / {{ safety.caution }} / {{ safety.avoid }}</div>
+        <div class="summary-sub">Safe / Caution / Avoid</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Avg Protein</div>
+        <div class="summary-value">{{ averages.protein | number:'1.0-0' }}g</div>
+        <div class="summary-sub">Per item</div>
+      </div>
+    </div>
+
+    <div class="section-header" *ngIf="!loading && !error">
+      <h3>Search Results</h3>
+      <span class="muted">Tap a card to review nutrients</span>
+    </div>
+
+    <div class="results-grid" *ngIf="!loading && !error && filteredFoods.length > 0">
+      <article class="food-card" *ngFor="let food of filteredFoods">
+        <div class="food-title">
+          <div>
+            <div class="name">{{ food.name }}</div>
+            <div class="meal-type">{{ mealLabel(food.meal_type) }}</div>
+          </div>
+          <span class="pill" [ngClass]="pillClass(food.traffic_light)">{{ pillLabel(food.traffic_light) }}</span>
+        </div>
+        <div class="macro-row">
+          <div class="macro">
+            <span class="label">Calories</span>
+            <span class="value">{{ food.calories | number:'1.0-0' }}</span>
+          </div>
+          <div class="macro">
+            <span class="label">Protein</span>
+            <span class="value">{{ toNumber(food.protein_g) | number:'1.0-0' }}g</span>
+          </div>
+          <div class="macro">
+            <span class="label">Carbs</span>
+            <span class="value">{{ toNumber(food.carbs_g) | number:'1.0-0' }}g</span>
+          </div>
+          <div class="macro">
+            <span class="label">Fat</span>
+            <span class="value">{{ toNumber(food.fat_g) | number:'1.0-0' }}g</span>
+          </div>
+        </div>
+        <div class="micro-row">
+          <span>Sugar {{ toNumber(food.sugar_g) | number:'1.0-0' }}g</span>
+          <span>Sodium {{ toNumber(food.sodium_mg) | number:'1.0-0' }}mg</span>
+          <span>Cholesterol {{ toNumber(food.cholesterol_mg) | number:'1.0-0' }}mg</span>
+        </div>
+
+        <button
+          type="button"
+          class="btn ghost see-more"
+          (click)="toggleDetails(food.id)"
+          [attr.aria-expanded]="isExpanded(food.id)"
+        >
+          {{ isExpanded(food.id) ? 'Hide details' : 'See more' }}
+        </button>
+
+        <div class="details-panel" *ngIf="isExpanded(food.id)">
+          <div class="detail-row">
+            <span class="label">Meal Type</span>
+            <span class="value">{{ mealLabel(food.meal_type) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Protein</span>
+            <span class="value">{{ toNumber(food.protein_g) | number:'1.0-0' }} g</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Carbs</span>
+            <span class="value">{{ toNumber(food.carbs_g) | number:'1.0-0' }} g</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Fat</span>
+            <span class="value">{{ toNumber(food.fat_g) | number:'1.0-0' }} g</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Sugar</span>
+            <span class="value">{{ toNumber(food.sugar_g) | number:'1.0-0' }} g</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Sodium</span>
+            <span class="value">{{ toNumber(food.sodium_mg) | number:'1.0-0' }} mg</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Cholesterol</span>
+            <span class="value">{{ toNumber(food.cholesterol_mg) | number:'1.0-0' }} mg</span>
+          </div>
+          <div class="detail-row" *ngIf="food.vitamins && vitaminKeys(food).length > 0">
+            <span class="label">Vitamins</span>
+            <span class="value">
+              {{ vitaminKeys(food).join(', ') }}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="empty-card" *ngIf="!loading && !error && filteredFoods.length === 0">
+      <p class="muted">No foods matched that search. Try a different keyword or remove filters.</p>
+    </div>
+  </app-shell>
+  

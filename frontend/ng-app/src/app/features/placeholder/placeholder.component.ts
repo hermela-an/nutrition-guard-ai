@@ -6,15 +6,8 @@ import { AppShellComponent } from '../../shared/components/app-shell.component';
 @Component({
   standalone: true,
   imports: [CommonModule, AppShellComponent],
-  template: `
-  <app-shell [items]="menuItems">
-    <h2>{{ title }}</h2>
-    <div class="card" style="margin-top:12px;">
-      <p><strong>Placeholder:</strong> This page is prepared in Angular structure and ready for implementation.</p>
-      <p class="muted">Next iteration will add full UI and API integration for {{ title.toLowerCase() }}.</p>
-    </div>
-  </app-shell>
-  `
+  templateUrl: './placeholder.component.html',
+  styleUrls: ['./placeholder.component.css']
 })
 export class PlaceholderComponent {
   private readonly route = inject(ActivatedRoute);

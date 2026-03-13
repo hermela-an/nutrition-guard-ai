@@ -1,0 +1,54 @@
+
+  <app-shell [items]="menuItems">
+    <div class="loading-overlay" *ngIf="loading">
+      <div class="spinner"></div>
+    </div>
+    <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+    <div class="spaced">
+      <div>
+        <h2>User Dashboard</h2>
+        <p class="muted">Welcome back. Here is your personalized snapshot for today.</p>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:12px;" *ngIf="!loading && !error">
+      <div class="card">
+        <small class="muted">Target Calories</small>
+        <div class="stat-value">{{ targets?.target_calories | number:'1.0-0' }}</div>
+        <span class="pill safe">Goal: {{ goalLabel }}</span>
+      </div>
+      <div class="card">
+        <small class="muted">Sodium Consumed</small>
+        <div class="stat-value">{{ sodiumDisplay }}</div>
+        <span class="pill caution">{{ sodiumNote }}</span>
+      </div>
+      <div class="card">
+        <small class="muted">Weight Trend (30d)</small>
+        <div class="stat-value">{{ weightTrendDisplay }}</div>
+        <span class="pill safe">{{ weightTrendNote }}</span>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:12px;" *ngIf="!loading && !error">
+      <div class="card">
+        <small class="muted">Breakfast Picks</small>
+        <ul class="mini-list">
+          <li *ngFor="let item of plan?.breakfast">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+        </ul>
+      </div>
+      <div class="card">
+        <small class="muted">Lunch Picks</small>
+        <ul class="mini-list">
+          <li *ngFor="let item of plan?.lunch">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+        </ul>
+      </div>
+      <div class="card">
+        <small class="muted">Dinner Picks</small>
+        <ul class="mini-list">
+          <li *ngFor="let item of plan?.dinner">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+        </ul>
+      </div>
+    </div>
+  </app-shell>
+  
