@@ -60,7 +60,7 @@
         </div>
         <ul class="meal-items">
           <li *ngFor="let item of meal.items">
-            <div class="item-name">{{ item.name }}</div>
+            <div class="item-name">{{ item.food_name }}</div>
             <div class="item-meta">
               <span>{{ item.portion }}</span>
               <span>{{ item.calories | number:'1.0-0' }} cal</span>

@@ -35,8 +35,10 @@ interface MealSuggestion {
 }
 
 interface MealPlanItem {
-  name: string;
+  food_name: string;
   calories: number;
+  portion_amount?: number | null;
+  portion_unit?: string | null;
   traffic_light?: string;
 }
 
@@ -193,8 +195,16 @@ export class NutritionPlanComponent implements OnInit {
   }
 
   private buildMealSuggestionsFromPlan(plan: MealPlanResponse): MealSuggestion[] {
+    const formatPortion = (item: MealPlanItem): string => {
+      const amount = this.formatAmount(item.portion_amount);
+      const unit = (item.portion_unit ?? '').trim();
+      if (amount && unit) return `${amount} ${unit}`;
+      if (amount) return amount;
+      return '1 serving';
+    };
+
     const toItems = (items: MealPlanItem[] | undefined) =>
-      (items ?? []).map((item) => `${item.name} · ${item.calories} cal`);
+      (items ?? []).map((item) => `${item.food_name} · ${formatPortion(item)} · ${this.formatAmount(item.calories)} cal`);
 
     return [
       { meal: 'Breakfast', emoji: '🍳', items: toItems(plan.breakfast) },
@@ -389,6 +399,23 @@ export class NutritionPlanComponent implements OnInit {
       return;
     }
     this.bmiCategory = { text: 'Obese', color: '#d64545' };
+  }
+
+  private formatAmount(value: unknown): string {
+    const numberValue = this.toNumber(value);
+    if (numberValue <= 0) return '';
+    if (Math.abs(numberValue - Math.round(numberValue)) < 0.001) {
+      return String(Math.round(numberValue));
+    }
+    return String(numberValue);
+  }
+
+  private toNumber(value: unknown): number {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+    return 0;
   }
 
   getProgressPercentage(data: { current: number; target: number }): number {

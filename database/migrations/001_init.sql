@@ -23,8 +23,10 @@ CREATE INDEX IF NOT EXISTS idx_profiles_health_metadata ON profiles USING GIN (h
 
 CREATE TABLE IF NOT EXISTS food_items (
   id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
+  food_name TEXT NOT NULL,
   meal_type TEXT NOT NULL,
+  portion_amount DOUBLE PRECISION NOT NULL,
+  portion_unit TEXT NOT NULL,
   calories INT NOT NULL CHECK (calories >= 0),
   protein_g DOUBLE PRECISION NOT NULL DEFAULT 0,
   carbs_g DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS food_items (
   vitamins JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_food_items_name ON food_items (LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_food_items_food_name ON food_items (LOWER(food_name));
 CREATE INDEX IF NOT EXISTS idx_food_items_meal_type ON food_items (meal_type);
 
 CREATE TABLE IF NOT EXISTS daily_logs (

@@ -43,7 +43,9 @@ export class ProfileSetupComponent {
     high_cholesterol: false,
     low_bp: false,
     anemia: false,
-    allergy: false
+    allergy: false,
+    heart_disease: false,
+    kidney_disease: false
   };
 
   form = this.fb.group({
@@ -58,7 +60,9 @@ export class ProfileSetupComponent {
     high_cholesterol: [this.defaultFormValues.high_cholesterol],
     low_bp: [this.defaultFormValues.low_bp],
     anemia: [this.defaultFormValues.anemia],
-    allergy: [this.defaultFormValues.allergy]
+    allergy: [this.defaultFormValues.allergy],
+    heart_disease: [this.defaultFormValues.heart_disease],
+    kidney_disease: [this.defaultFormValues.kidney_disease]
   });
 
   constructor(private readonly profile: ProfileService, private readonly router: Router) {
@@ -80,7 +84,9 @@ export class ProfileSetupComponent {
           high_cholesterol: !!res.health_metadata?.['high_cholesterol'],
           low_bp: !!res.health_metadata?.['low_bp'],
           anemia: !!res.health_metadata?.['anemia'],
-          allergy: !!res.health_metadata?.['allergy']
+          allergy: !!res.health_metadata?.['allergy'],
+          heart_disease: !!res.health_metadata?.['heart_disease'],
+          kidney_disease: !!res.health_metadata?.['kidney_disease']
         };
         this.form.patchValue(values);
       },
@@ -114,7 +120,9 @@ export class ProfileSetupComponent {
         high_cholesterol: !!v.high_cholesterol,
         low_bp: !!v.low_bp,
         anemia: !!v.anemia,
-        allergy: !!v.allergy
+        allergy: !!v.allergy,
+        heart_disease: !!v.heart_disease,
+        kidney_disease: !!v.kidney_disease
       }
     };
 

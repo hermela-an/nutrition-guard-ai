@@ -9,8 +9,10 @@ import { finalize, map, switchMap, timeout } from 'rxjs/operators';
 import { forkJoin } from 'rxjs';
 
 interface MealItem {
-  name: string;
-  portion: string;
+  food_name: string;
+  portion?: string;
+  portion_amount?: number | null;
+  portion_unit?: string | null;
   calories: number;
   traffic_light?: string;
 }
@@ -122,8 +124,8 @@ export class DailyMealPlanComponent {
 
   private toMeal(title: string, time: string, items: MealItem[]): MealBlock {
     const normalized = items.map((item) => ({
-      name: item.name,
-      portion: item.portion ?? '1 serving',
+      food_name: item.food_name,
+      portion: item.portion ?? this.formatPortion(item),
       calories: Number(item.calories ?? 0),
       traffic_light: item.traffic_light
     }));
@@ -136,5 +138,30 @@ export class DailyMealPlanComponent {
       targetCalories,
       items: normalized
     };
+  }
+
+  private formatPortion(item: MealItem): string {
+    const amount = this.formatAmount(item.portion_amount);
+    const unit = (item.portion_unit ?? '').trim();
+    if (amount && unit) return `${amount} ${unit}`;
+    if (amount) return amount;
+    return '1 serving';
+  }
+
+  private formatAmount(value: unknown): string {
+    const numberValue = this.toNumber(value);
+    if (numberValue <= 0) return '';
+    if (Math.abs(numberValue - Math.round(numberValue)) < 0.001) {
+      return String(Math.round(numberValue));
+    }
+    return String(numberValue);
+  }
+
+  private toNumber(value: unknown): number {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+    return 0;
   }
 }

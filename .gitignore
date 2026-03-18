@@ -1,5 +1,6 @@
 backend/target/
 backend/.env
+.m2/
 **/.DS_Store
 **/node_modules/
 *.log

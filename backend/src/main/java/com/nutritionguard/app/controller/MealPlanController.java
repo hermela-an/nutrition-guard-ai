@@ -3,6 +3,7 @@ package com.nutritionguard.app.controller;
 import com.nutritionguard.app.service.ProfileService;
 import com.nutritionguard.app.util.EventAddresses;
 import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.ReplyException;
 import io.vertx.ext.web.Router;
 
 public class MealPlanController {
@@ -24,7 +25,33 @@ public class MealPlanController {
         return vertx.eventBus().<io.vertx.core.json.JsonObject>request(EventAddresses.FILTER_MEAL_PLAN, profile)
           .map(msg -> msg.body());
       }).onSuccess(plan -> ctx.response().putHeader("Content-Type", "application/json").end(plan.encode()))
-        .onFailure(err -> ctx.response().setStatusCode(400).end(err.getMessage()));
+        .onFailure(err -> {
+          err.printStackTrace();
+          int status = statusFrom(err, 400);
+          ctx.response().setStatusCode(status).end(messageFrom(err));
+        });
     });
+  }
+
+  private int statusFrom(Throwable err, int fallback) {
+    if (err instanceof ReplyException re) {
+      return re.failureCode();
+    }
+    String msg = err.getMessage();
+    if (msg != null && msg.equalsIgnoreCase("Profile not found")) {
+      return 404;
+    }
+    return fallback;
+  }
+
+  private String messageFrom(Throwable err) {
+    if (err instanceof ReplyException re) {
+      String msg = re.getMessage();
+      if (msg != null && !msg.isBlank()) {
+        return msg;
+      }
+    }
+    String msg = err.getMessage();
+    return msg == null ? "Request failed" : msg;
   }
 }

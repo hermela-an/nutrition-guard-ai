@@ -9,8 +9,10 @@ import { AuthService } from '../../core/services/auth.service';
 
 interface FoodItem {
   id: number;
-  name: string;
+  food_name: string;
   meal_type: string | null;
+  portion_amount: number | null;
+  portion_unit: string | null;
   calories: number;
   protein_g: number | null;
   carbs_g: number | null;
@@ -23,7 +25,7 @@ interface FoodItem {
 }
 
 type MealFilter = 'all' | 'breakfast' | 'lunch' | 'dinner' | 'snack';
-type SortMode = 'name' | 'calories' | 'protein';
+type SortMode = 'food_name' | 'calories' | 'protein';
 
 @Component({
   standalone: true,
@@ -55,7 +57,7 @@ export class FoodSearchComponent implements OnInit {
   filteredFoods: FoodItem[] = [];
 
   mealFilter: MealFilter = 'all';
-  sortMode: SortMode = 'name';
+  sortMode: SortMode = 'food_name';
 
   averages = {
     calories: 0,
@@ -124,7 +126,7 @@ export class FoodSearchComponent implements OnInit {
     } else if (this.sortMode === 'protein') {
       working.sort((a, b) => this.toNumber(b.protein_g) - this.toNumber(a.protein_g));
     } else {
-      working.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      working.sort((a, b) => String(a.food_name).localeCompare(String(b.food_name)));
     }
 
     this.filteredFoods = working;
@@ -188,6 +190,25 @@ export class FoodSearchComponent implements OnInit {
   mealLabel(mealType: string | null | undefined): string {
     if (!mealType) return 'Unknown meal';
     return mealType.replace('_', ' ');
+  }
+
+  formatAmount(value: unknown): string {
+    const numberValue = this.toNumber(value);
+    if (Math.abs(numberValue - Math.round(numberValue)) < 0.001) {
+      return String(Math.round(numberValue));
+    }
+    return String(numberValue);
+  }
+
+  formatPortion(food: FoodItem): string {
+    const amount = this.formatAmount(food.portion_amount);
+    const unit = (food.portion_unit ?? '').trim();
+    return unit ? `${amount} ${unit}` : amount;
+  }
+
+  formatHeadline(food: FoodItem): string {
+    const calories = this.formatAmount(food.calories);
+    return `${food.food_name} · ${this.formatPortion(food)} · ${calories} cal`;
   }
 
   vitaminKeys(food: FoodItem): string[] {

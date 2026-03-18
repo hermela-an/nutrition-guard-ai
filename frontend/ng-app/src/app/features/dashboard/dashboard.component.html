@@ -34,19 +34,19 @@
       <div class="card">
         <small class="muted">Breakfast Picks</small>
         <ul class="mini-list">
-          <li *ngFor="let item of plan?.breakfast">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+          <li *ngFor="let item of plan?.breakfast">{{ item.food_name }} · {{ item.calories | number:'1.0-0' }} cal</li>
         </ul>
       </div>
       <div class="card">
         <small class="muted">Lunch Picks</small>
         <ul class="mini-list">
-          <li *ngFor="let item of plan?.lunch">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+          <li *ngFor="let item of plan?.lunch">{{ item.food_name }} · {{ item.calories | number:'1.0-0' }} cal</li>
         </ul>
       </div>
       <div class="card">
         <small class="muted">Dinner Picks</small>
         <ul class="mini-list">
-          <li *ngFor="let item of plan?.dinner">{{ item.name }} · {{ item.calories | number:'1.0-0' }} cal</li>
+          <li *ngFor="let item of plan?.dinner">{{ item.food_name }} · {{ item.calories | number:'1.0-0' }} cal</li>
         </ul>
       </div>
     </div>

@@ -15,8 +15,10 @@ interface TargetResponse {
 }
 
 interface MealPlanItem {
-  name: string;
+  food_name: string;
   calories: number;
+  portion_amount?: number | null;
+  portion_unit?: string | null;
 }
 
 interface MealPlanResponse {

@@ -52,7 +52,7 @@ public class VitaminChatService {
           }
           JsonObject first = items.getJsonObject(0);
           JsonObject vitamins = first.getJsonObject("vitamins", new JsonObject());
-          String name = first.getString("name");
+          String name = first.getString("food_name");
           
           StringBuilder answer = new StringBuilder();
           answer.append("Yes! **").append(name).append("** is a great, nutrient-dense choice. ");

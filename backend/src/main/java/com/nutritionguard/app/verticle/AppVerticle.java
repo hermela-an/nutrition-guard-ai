@@ -29,6 +29,7 @@ import java.util.Set;
 public class AppVerticle extends AbstractVerticle {
   private final Database db;
   private final AppConfig config;
+  private static final String BUILD_TAG = "foodrepo-jsonb-v3";
 
   public AppVerticle(Database db, AppConfig config) {
     this.db = db;
@@ -38,6 +39,11 @@ public class AppVerticle extends AbstractVerticle {
   @Override
   public void start() {
     Router router = Router.router(vertx);
+
+    router.route().handler(ctx -> {
+      ctx.response().putHeader("X-NG-Build", BUILD_TAG);
+      ctx.next();
+    });
 
     router.route().handler(CorsHandler.create("*")
       .allowedMethods(Set.of(io.vertx.core.http.HttpMethod.GET, io.vertx.core.http.HttpMethod.POST, io.vertx.core.http.HttpMethod.PUT))
