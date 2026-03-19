@@ -6,14 +6,18 @@ import com.nutritionguard.app.controller.CalculationController;
 import com.nutritionguard.app.controller.ChatController;
 import com.nutritionguard.app.controller.FoodSearchController;
 import com.nutritionguard.app.controller.MealPlanController;
+import com.nutritionguard.app.controller.NotificationController;
 import com.nutritionguard.app.controller.ProfileController;
 import com.nutritionguard.app.controller.ProgressController;
 import com.nutritionguard.app.db.Database;
 import com.nutritionguard.app.repository.FoodRepository;
+import com.nutritionguard.app.repository.MealTrackingRepository;
+import com.nutritionguard.app.repository.NotificationRepository;
 import com.nutritionguard.app.repository.ProfileRepository;
 import com.nutritionguard.app.repository.ProgressRepository;
 import com.nutritionguard.app.routes.AuthMiddleware;
 import com.nutritionguard.app.service.FoodSearchService;
+import com.nutritionguard.app.service.NotificationService;
 import com.nutritionguard.app.service.ProfileService;
 import com.nutritionguard.app.service.ProgressService;
 import com.nutritionguard.app.util.EventAddresses;
@@ -54,6 +58,8 @@ public class AppVerticle extends AbstractVerticle {
     ProfileService profileService = new ProfileService(new ProfileRepository(db));
     FoodSearchService foodSearchService = new FoodSearchService(new FoodRepository(db));
     ProgressService progressService = new ProgressService(new ProgressRepository(db));
+    NotificationService notificationService = new NotificationService(new NotificationRepository(db));
+    MealTrackingRepository mealTrackingRepository = new MealTrackingRepository(db);
 
     new AuthController(vertx).mount(router);
     new CalculationController(vertx).mount(router);
@@ -64,12 +70,14 @@ public class AppVerticle extends AbstractVerticle {
     router.route("/api/foods*").handler(auth::handle);
     router.route("/api/progress*").handler(auth::handle);
     router.route("/api/chat*").handler(auth::handle);
+    router.route("/api/notifications*").handler(auth::handle);
 
-    new ProfileController(profileService).mount(router);
-    new MealPlanController(vertx, profileService).mount(router);
-    new FoodSearchController(foodSearchService, profileService).mount(router);
+    new ProfileController(profileService, notificationService).mount(router);
+    new MealPlanController(vertx, profileService, notificationService, mealTrackingRepository).mount(router);
+    new FoodSearchController(foodSearchService, profileService, notificationService).mount(router);
     new ProgressController(progressService).mount(router);
-    new ChatController(vertx).mount(router);
+    new ChatController(vertx, profileService, foodSearchService, notificationService).mount(router);
+    new NotificationController(notificationService).mount(router);
 
     router.get("/health").handler(ctx -> ctx.end("OK"));
 

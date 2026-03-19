@@ -1,17 +1,22 @@
 package com.nutritionguard.app.controller;
 
 import com.nutritionguard.app.service.FoodSearchService;
+import com.nutritionguard.app.service.NotificationService;
 import com.nutritionguard.app.service.ProfileService;
 import io.vertx.core.eventbus.ReplyException;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 
 public class FoodSearchController {
   private final FoodSearchService foodSearch;
   private final ProfileService profiles;
+  private final NotificationService notifications;
 
-  public FoodSearchController(FoodSearchService foodSearch, ProfileService profiles) {
+  public FoodSearchController(FoodSearchService foodSearch, ProfileService profiles, NotificationService notifications) {
     this.foodSearch = foodSearch;
     this.profiles = profiles;
+    this.notifications = notifications;
   }
 
   public void mount(Router router) {
@@ -23,13 +28,52 @@ public class FoodSearchController {
           return io.vertx.core.Future.failedFuture("Profile not found");
         }
         return foodSearch.search(query == null ? "" : query, profile.getJsonObject("health_metadata"));
-      }).onSuccess(result -> ctx.response().putHeader("Content-Type", "application/json").end(result.encode()))
+      }).onSuccess(result -> {
+          maybeNotifySearch(userId, query, result);
+          ctx.response().putHeader("Content-Type", "application/json").end(result.encode());
+        })
         .onFailure(err -> {
           err.printStackTrace();
           int status = statusFrom(err, 400);
           ctx.response().setStatusCode(status).end(messageFrom(err));
         });
     });
+  }
+
+  private void maybeNotifySearch(String userId, String query, JsonArray result) {
+    if (result == null || result.isEmpty()) return;
+    int redCount = 0;
+    JsonArray examples = new JsonArray();
+
+    for (int i = 0; i < result.size(); i++) {
+      JsonObject item = result.getJsonObject(i);
+      if (item == null) continue;
+      if ("RED".equalsIgnoreCase(item.getString("traffic_light"))) {
+        redCount++;
+        if (examples.size() < 3) {
+          examples.add(item.getString("food_name", "Food"));
+        }
+      }
+    }
+
+    if (redCount <= 0) return;
+
+    String q = (query == null ? "" : query).trim();
+    String title = "Food safety alert";
+    String message = q.isEmpty()
+      ? "Some foods in your results are flagged as RED for your health profile."
+      : "Some foods matching \"" + q + "\" are flagged as RED for your health profile.";
+
+    notifications.create(
+      userId,
+      NotificationService.TYPE_ALERT,
+      title,
+      message,
+      new JsonObject()
+        .put("query", q)
+        .put("red_count", redCount)
+        .put("examples", examples)
+    ).onFailure(err -> err.printStackTrace());
   }
 
   private int statusFrom(Throwable err, int fallback) {

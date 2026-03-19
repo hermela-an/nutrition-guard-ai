@@ -9,6 +9,14 @@ interface ChatMessage {
   isUser: boolean;
   time: Date;
   imageUrl?: string;
+  imageErrored?: boolean;
+  imageRetryCount?: number;
+}
+
+interface SuggestionChip {
+  label: string;
+  question: string;
+  vitaminKey?: string;
 }
 
 @Component({
@@ -47,9 +55,13 @@ interface ChatMessage {
           <span class="muted">Ask me about your diet, meals, or vitamin suggestions.</span>
           
           <div class="suggestion-chips">
-            <button (click)="quickAsk('What are some good sources of iron?')">Iron sources</button>
-            <button (click)="quickAsk('How much water should I drink?')">Hydration</button>
-            <button (click)="quickAsk('Healthy snacks for late night?')">Late night snacks</button>
+            <button
+              type="button"
+              *ngFor="let chip of suggestionChips"
+              (click)="quickAsk(chip.question, chip.vitaminKey)"
+            >
+              {{ chip.label }}
+            </button>
           </div>
         </div>
 
@@ -57,7 +69,26 @@ interface ChatMessage {
           <div class="message" [class.user-msg]="msg.isUser" [class.ai-msg]="!msg.isUser">
             <div class="message-bubble">
               <span [innerHTML]="formatText(msg.text)"></span>
-              <img *ngIf="msg.imageUrl" [src]="msg.imageUrl" class="chat-img" alt="Attached resource" loading="lazy">
+              <img
+                *ngIf="msg.imageUrl && !msg.imageErrored"
+                [src]="msg.imageUrl"
+                class="chat-img"
+                alt="Attached resource"
+                loading="lazy"
+                crossorigin="anonymous"
+                referrerpolicy="origin"
+                (error)="handleImageError(msg)"
+              >
+              <img
+                *ngIf="msg.imageUrl && msg.imageErrored"
+                [src]="fallbackImageUrl"
+                class="chat-img"
+                alt="Image unavailable"
+                loading="lazy"
+                crossorigin="anonymous"
+                referrerpolicy="origin"
+                (error)="hideImage(msg)"
+              >
             </div>
             <div class="message-time">{{ msg.time | date:'shortTime' }}</div>
           </div>
@@ -418,6 +449,77 @@ export class FloatingChatComponent implements AfterViewChecked {
   currentInput = '';
   shouldScroll = false;
 
+  readonly suggestionChips: SuggestionChip[] = [
+    {
+      label: 'Vitamin A',
+      vitaminKey: 'vitamin_a',
+      question: 'Show me foods in our database rich in Vitamin A.'
+    },
+    {
+      label: 'Vitamin D',
+      vitaminKey: 'vitamin_d',
+      question: 'Show me foods in our database rich in Vitamin D.'
+    },
+    {
+      label: 'Vitamin E',
+      vitaminKey: 'vitamin_e',
+      question: 'Show me foods in our database rich in Vitamin E.'
+    },
+    {
+      label: 'Vitamin K',
+      vitaminKey: 'vitamin_k',
+      question: 'Show me foods in our database rich in Vitamin K.'
+    },
+    {
+      label: 'Vitamin B1 (Thiamine)',
+      vitaminKey: 'vitamin_b1',
+      question: 'Show me foods in our database rich in Vitamin B1 (Thiamine).'
+    },
+    {
+      label: 'Vitamin B2 (Riboflavin)',
+      vitaminKey: 'vitamin_b2',
+      question: 'Show me foods in our database rich in Vitamin B2 (Riboflavin).'
+    },
+    {
+      label: 'Vitamin B3 (Niacin)',
+      vitaminKey: 'vitamin_b3',
+      question: 'Show me foods in our database rich in Vitamin B3 (Niacin).'
+    },
+    {
+      label: 'Vitamin B5 (Pantothenic Acid)',
+      vitaminKey: 'vitamin_b5',
+      question: 'Show me foods in our database rich in Vitamin B5 (Pantothenic Acid).'
+    },
+    {
+      label: 'Vitamin B6 (Pyridoxine)',
+      vitaminKey: 'vitamin_b6',
+      question: 'Show me foods in our database rich in Vitamin B6 (Pyridoxine).'
+    },
+    {
+      label: 'Vitamin B7 (Biotin)',
+      vitaminKey: 'vitamin_b7',
+      question: 'Show me foods in our database rich in Vitamin B7 (Biotin).'
+    },
+    {
+      label: 'Vitamin B9 (Folate / Folic Acid)',
+      vitaminKey: 'vitamin_b9',
+      question: 'Show me foods in our database rich in Vitamin B9 (Folate / Folic Acid).'
+    },
+    {
+      label: 'Vitamin B12 (Cobalamin)',
+      vitaminKey: 'vitamin_b12',
+      question: 'Show me foods in our database rich in Vitamin B12 (Cobalamin).'
+    },
+    {
+      label: 'Vitamin C (Ascorbic Acid)',
+      vitaminKey: 'vitamin_c',
+      question: 'Show me foods in our database rich in Vitamin C (Ascorbic Acid).'
+    }
+  ];
+
+  readonly fallbackImageUrl =
+    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80';
+
   messages: ChatMessage[] = [];
 
   ngAfterViewChecked(): void {
@@ -434,13 +536,18 @@ export class FloatingChatComponent implements AfterViewChecked {
     }
   }
 
-  quickAsk(question: string): void {
-    this.currentInput = question;
-    this.sendMessage();
+  quickAsk(question: string, vitaminKey?: string): void {
+    this.sendMessageWithPayload(question, vitaminKey ? { vitaminKey, limit: 15 } : undefined);
   }
 
   sendMessage(): void {
     const text = this.currentInput.trim();
+    if (!text || this.isTyping) return;
+    this.sendMessageWithPayload(text);
+    this.currentInput = '';
+  }
+
+  private sendMessageWithPayload(text: string, extra?: Record<string, unknown>): void {
     if (!text || this.isTyping) return;
 
     // Add user message to UI immediately
@@ -450,12 +557,12 @@ export class FloatingChatComponent implements AfterViewChecked {
       time: new Date()
     });
     
-    this.currentInput = '';
     this.isTyping = true;
     this.shouldScroll = true;
 
     // Call REST endpoint mapped safely across Vert.x Event Bus
-    this.api.post<{ answer?: string, response?: string, imageUrl?: string, error?: string }>('/api/chat/ask', { question: text }, this.auth.authHeaders())
+    const payload = { question: text, ...(extra ?? {}) };
+    this.api.post<{ answer?: string, response?: string, imageUrl?: string, error?: string }>('/api/chat/ask', payload, this.auth.authHeaders())
       .subscribe({
         next: (resp) => {
           this.isTyping = false;
@@ -466,7 +573,9 @@ export class FloatingChatComponent implements AfterViewChecked {
             text: aiResponse,
             isUser: false,
             time: new Date(),
-            imageUrl: resp.imageUrl
+            imageUrl: (resp.imageUrl ?? '').trim() || undefined,
+            imageErrored: false,
+            imageRetryCount: 0
           });
           this.shouldScroll = true;
           this.cdr.detectChanges();
@@ -494,5 +603,32 @@ export class FloatingChatComponent implements AfterViewChecked {
     try {
       this.chatBody.nativeElement.scrollTop = this.chatBody.nativeElement.scrollHeight;
     } catch (err) {}
+  }
+
+  handleImageError(msg: ChatMessage): void {
+    const attempts = msg.imageRetryCount ?? 0;
+    if (attempts < 1 && msg.imageUrl) {
+      msg.imageRetryCount = attempts + 1;
+      msg.imageErrored = false;
+      msg.imageUrl = this.withCacheBust(msg.imageUrl);
+      this.cdr.detectChanges();
+      return;
+    }
+    msg.imageErrored = true;
+    this.cdr.detectChanges();
+  }
+
+  hideImage(msg: ChatMessage): void {
+    msg.imageUrl = undefined;
+    msg.imageErrored = false;
+    msg.imageRetryCount = 0;
+    this.cdr.detectChanges();
+  }
+
+  private withCacheBust(url: string): string {
+    const trimmed = (url ?? '').trim();
+    if (!trimmed) return trimmed;
+    const separator = trimmed.includes('?') ? '&' : '?';
+    return `${trimmed}${separator}ng_retry=${Date.now()}`;
   }
 }

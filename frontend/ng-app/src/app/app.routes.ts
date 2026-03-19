@@ -7,10 +7,10 @@ import { ProfileSetupComponent } from './features/profile/profile-setup.componen
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { BmiCalculatorComponent } from './features/bmi/bmi-calculator.component';
 import { NutritionPlanComponent } from './features/nutrition-plan/nutrition-plan.component';
-import { PlaceholderComponent } from './features/placeholder/placeholder.component';
 import { DailyMealPlanComponent } from './features/daily-meal-plan/daily-meal-plan.component';
 import { ProgressTrackingComponent } from './features/progress-tracking/progress-tracking.component';
 import { FoodSearchComponent } from './features/food-search/food-search.component';
+import { NotificationsComponent } from './features/notifications/notifications.component';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
@@ -23,6 +23,6 @@ export const routes: Routes = [
   { path: 'daily-meal-plan', component: DailyMealPlanComponent, canActivate: [authGuard] },
   { path: 'progress-tracking', component: ProgressTrackingComponent, canActivate: [authGuard] },
   { path: 'food-search', component: FoodSearchComponent, canActivate: [authGuard] },
-  { path: 'notifications', component: PlaceholderComponent, canActivate: [authGuard], data: { title: 'Notifications' } },
+  { path: 'notifications', component: NotificationsComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' }
 ];

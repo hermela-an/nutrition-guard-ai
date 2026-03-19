@@ -19,7 +19,7 @@ public class SocketVerticle extends AbstractVerticle {
     VitaminChatService service = new VitaminChatService(new FoodRepository(db));
     vertx.eventBus().consumer(EventAddresses.CHAT_ASK, msg -> {
       JsonObject body = (JsonObject) msg.body();
-      service.ask(body.getString("question"))
+      service.ask(body)
         .onSuccess(msg::reply)
         .onFailure(err -> msg.fail(400, err.getMessage()));
     });

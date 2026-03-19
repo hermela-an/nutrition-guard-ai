@@ -39,6 +39,11 @@
         <div class="summary-value">{{ totals.waterLiters }}L</div>
         <div class="summary-sub">Daily reminder</div>
       </div>
+      <div class="summary-card">
+        <div class="summary-label">Eaten</div>
+        <div class="summary-value">{{ totals.eatenRecommended }} / {{ totals.totalRecommended }}</div>
+        <div class="summary-sub">{{ eatenPercentage }}% of recommendations</div>
+      </div>
     </div>
 
     <div class="section-header" *ngIf="!loading && !error">
@@ -60,10 +65,18 @@
         </div>
         <ul class="meal-items">
           <li *ngFor="let item of meal.items">
-            <div class="item-name">{{ item.food_name }}</div>
+            <label class="eaten-row">
+              <input type="checkbox" [checked]="!!item.eaten" (change)="toggleEaten(item)">
+              <div class="item-content">
+                <div class="item-name">{{ item.food_name }}</div>
+                <div class="item-meta">
+                  <span>{{ item.portion }}</span>
+                  <span>{{ item.calories | number:'1.0-0' }} cal</span>
+                </div>
+              </div>
+            </label>
             <div class="item-meta">
-              <span>{{ item.portion }}</span>
-              <span>{{ item.calories | number:'1.0-0' }} cal</span>
+              <span *ngIf="item.traffic_light" class="pill" [ngClass]="item.traffic_light.toLowerCase()">{{ item.traffic_light }}</span>
             </div>
           </li>
         </ul>
@@ -81,13 +94,13 @@
 
     <div class="progress-card" *ngIf="!loading && !error">
       <div class="progress-header">
-        <span class="label">Calories</span>
-        <span class="value">{{ totals.plannedCalories | number:'1.0-0' }} / {{ totals.targetCalories | number:'1.0-0' }}</span>
+        <span class="label">Eaten progress</span>
+        <span class="value">{{ totals.eatenRecommended }} / {{ totals.totalRecommended }}</span>
       </div>
       <div class="progress-bar">
-        <div class="progress-fill" [style.width]="progressPercentage + '%'"></div>
+        <div class="progress-fill" [style.width]="eatenPercentage + '%'"></div>
       </div>
-      <div class="progress-sub muted">Aim to stay within 5% of your target.</div>
+      <div class="progress-sub muted">Mark foods as eaten to track compliance.</div>
     </div>
   </app-shell>
   

@@ -9,19 +9,21 @@ import { finalize, map, switchMap, timeout } from 'rxjs/operators';
 import { forkJoin } from 'rxjs';
 
 interface MealItem {
+  id: number;
   food_name: string;
   portion?: string;
   portion_amount?: number | null;
   portion_unit?: string | null;
   calories: number;
   traffic_light?: string;
+  eaten?: boolean;
 }
 
 interface MealBlock {
   title: string;
   time: string;
   targetCalories: number;
-  items: MealItem[];
+  items: Array<MealItem & { meal_type: string }>;
 }
 
 interface MealPlanResponse {
@@ -30,6 +32,7 @@ interface MealPlanResponse {
   lunch: MealItem[];
   dinner: MealItem[];
   snacks?: MealItem[];
+  progress?: { total: number; eaten: number };
 }
 
 @Component({
@@ -64,12 +67,19 @@ export class DailyMealPlanComponent {
     targetCalories: 0,
     plannedCalories: 0,
     protein: 0,
-    waterLiters: 2.5
+    waterLiters: 2.5,
+    totalRecommended: 0,
+    eatenRecommended: 0
   };
 
   get progressPercentage(): number {
     if (this.totals.targetCalories <= 0) return 0;
     return Math.min(100, Math.round((this.totals.plannedCalories / this.totals.targetCalories) * 100));
+  }
+
+  get eatenPercentage(): number {
+    if (this.totals.totalRecommended <= 0) return 0;
+    return Math.min(100, Math.round((this.totals.eatenRecommended / this.totals.totalRecommended) * 100));
   }
 
   constructor() {
@@ -106,11 +116,13 @@ export class DailyMealPlanComponent {
     ).subscribe({
       next: ({ targets, plan }) => {
         this.totals.targetCalories = Math.round(targets.target_calories ?? 0);
+        this.totals.totalRecommended = Number(plan.progress?.total ?? 0);
+        this.totals.eatenRecommended = Number(plan.progress?.eaten ?? 0);
 
         this.meals = [
-          this.toMeal('Breakfast', '07:30', plan.breakfast ?? []),
-          this.toMeal('Lunch', '12:45', plan.lunch ?? []),
-          this.toMeal('Dinner', '19:00', plan.dinner ?? [])
+          this.toMeal('Breakfast', '07:30', 'breakfast', plan.breakfast ?? []),
+          this.toMeal('Lunch', '12:45', 'lunch', plan.lunch ?? []),
+          this.toMeal('Dinner', '19:00', 'dinner', plan.dinner ?? [])
         ];
 
         this.totals.plannedCalories = this.meals.reduce((sum, meal) => sum + meal.targetCalories, 0);
@@ -122,12 +134,15 @@ export class DailyMealPlanComponent {
     });
   }
 
-  private toMeal(title: string, time: string, items: MealItem[]): MealBlock {
+  private toMeal(title: string, time: string, mealType: string, items: MealItem[]): MealBlock {
     const normalized = items.map((item) => ({
+      id: item.id,
       food_name: item.food_name,
       portion: item.portion ?? this.formatPortion(item),
       calories: Number(item.calories ?? 0),
-      traffic_light: item.traffic_light
+      traffic_light: item.traffic_light,
+      eaten: !!item.eaten,
+      meal_type: mealType
     }));
 
     const targetCalories = normalized.reduce((sum, item) => sum + item.calories, 0);
@@ -138,6 +153,33 @@ export class DailyMealPlanComponent {
       targetCalories,
       items: normalized
     };
+  }
+
+  toggleEaten(item: MealItem & { meal_type?: string }): void {
+    const mealType = (item as unknown as { meal_type?: string }).meal_type ?? '';
+    if (!mealType || !item?.id) return;
+
+    const next = !item.eaten;
+    item.eaten = next;
+    this.cdr.detectChanges();
+
+    this.api.put<{ progress?: { total: number; eaten: number } }>('/api/meal-plan/intake', {
+      date: new Date().toISOString().slice(0, 10),
+      meal_type: mealType,
+      food_item_id: item.id,
+      eaten: next
+    }, this.auth.authHeaders()).subscribe({
+      next: (resp) => {
+        this.totals.totalRecommended = Number(resp?.progress?.total ?? this.totals.totalRecommended);
+        this.totals.eatenRecommended = Number(resp?.progress?.eaten ?? this.totals.eatenRecommended);
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        // rollback on error
+        item.eaten = !next;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   private formatPortion(item: MealItem): string {

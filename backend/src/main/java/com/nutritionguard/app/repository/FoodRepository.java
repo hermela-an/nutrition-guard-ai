@@ -93,6 +93,42 @@ public class FoodRepository {
     return db.query(sql, Tuple.of(mealType)).map(this::rowsToFoods);
   }
 
+  public Future<JsonArray> vitaminLeaderboard(String vitaminKey, int limit) {
+    int safeLimit = Math.max(1, Math.min(limit, 100));
+
+    String sql = """
+      WITH scored AS (
+        SELECT
+          id,
+          food_name,
+          vitamins,
+          vitamins->>$1 AS vitamin_value,
+          NULLIF(regexp_replace(COALESCE(vitamins->>$1, ''), '[^0-9\\\\.]', '', 'g'), '')::numeric AS vitamin_score
+        FROM food_items
+        WHERE vitamins ? $1
+      )
+      SELECT id, food_name, vitamins, vitamin_value
+      FROM scored
+      ORDER BY vitamin_score DESC NULLS LAST, food_name ASC
+      LIMIT $2
+      """;
+
+    return db
+      .query(sql, Tuple.of(vitaminKey, safeLimit))
+      .map(rows -> {
+        JsonArray items = new JsonArray();
+        for (Row row : rows) {
+          items.add(new JsonObject()
+            .put("id", row.getInteger("id"))
+            .put("food_name", row.getString("food_name"))
+            .put("vitamins", row.getJsonObject("vitamins"))
+            .put("vitamin_value", row.getString("vitamin_value"))
+          );
+        }
+        return items;
+      });
+  }
+
   private JsonArray rowsToFoods(RowSet<Row> rows) {
     JsonArray items = new JsonArray();
     for (Row row : rows) {

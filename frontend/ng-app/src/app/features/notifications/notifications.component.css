@@ -1,0 +1,108 @@
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: #7a8a7c;
+  font-weight: 700;
+}
+
+.muted {
+  color: #7a8a7c;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e6ede3;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.notif {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.notif:hover {
+  transform: translateY(-1px);
+}
+
+.notif.unread {
+  border-left: 5px solid #2e9f61;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+}
+
+.message {
+  margin-top: 8px;
+  color: #475a4b;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #d8dfcf;
+  color: #475a4b;
+  background: #f4f7f3;
+}
+
+.pill.alert {
+  border-color: #f2c0c0;
+  background: #fde8e8;
+  color: #8e2f2f;
+}
+
+.btn {
+  border: 1px solid #d8dfcf;
+  background: #2e9f61;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn.ghost {
+  background: white;
+  color: #475a4b;
+}
+
+.btn.danger {
+  background: #d64545;
+  border-color: #d64545;
+}
+

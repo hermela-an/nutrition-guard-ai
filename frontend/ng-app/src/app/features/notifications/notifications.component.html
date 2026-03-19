@@ -1,0 +1,39 @@
+<app-shell [items]="menuItems">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Alerts</div>
+      <h2>Notifications</h2>
+      <p class="muted">Health alerts flagged from search, meal plans, profile, and chat.</p>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" (click)="toggleUnreadOnly()">
+        {{ unreadOnly ? 'Show all' : 'Show unread' }}
+      </button>
+      <button class="btn" (click)="refresh()">Refresh</button>
+      <button class="btn danger" (click)="markAllRead()">Mark all read</button>
+    </div>
+  </div>
+
+  <div class="card" *ngIf="loading">Loading...</div>
+
+  <div class="empty" *ngIf="!loading && items.length === 0">
+    <div class="card">
+      <p><strong>No notifications</strong></p>
+      <p class="muted">You’re all caught up.</p>
+    </div>
+  </div>
+
+  <div class="list" *ngIf="!loading && items.length > 0">
+    <div class="notif card" *ngFor="let item of items" [class.unread]="!item.is_read" (click)="markRead(item)">
+      <div class="row">
+        <div class="title">
+          <span class="pill" [class.alert]="item.type === 'ALERT'">{{ item.type }}</span>
+          <span>{{ item.title }}</span>
+        </div>
+        <div class="time muted">{{ item.created_at | date:'short' }}</div>
+      </div>
+      <div class="message">{{ item.message }}</div>
+    </div>
+  </div>
+</app-shell>
+

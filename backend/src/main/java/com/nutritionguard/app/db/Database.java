@@ -57,4 +57,12 @@ public class Database {
         .compose(ignored -> conn.preparedQuery(sql).execute(params))
     );
   }
+
+  public Future<Void> execute(String sql) {
+    return pool.withConnection(conn ->
+      conn.query(setSearchPathSql).execute()
+        .compose(ignored -> conn.query(sql).execute())
+        .mapEmpty()
+    );
+  }
 }
