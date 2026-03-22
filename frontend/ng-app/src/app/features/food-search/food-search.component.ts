@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 interface FoodItem {
   id: number;
   food_name: string;
+  image_url?: string | null;
   meal_type: string | null;
   portion_amount: number | null;
   portion_unit: string | null;
@@ -37,6 +38,9 @@ export class FoodSearchComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
+
+  private readonly defaultFoodImageUrl =
+    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80';
 
   loading = true;
   error = '';
@@ -163,7 +167,7 @@ export class FoodSearchComponent implements OnInit {
 
     this.safety = this.filteredFoods.reduce(
       (acc, item) => {
-        const tag = (item.traffic_light ?? '').toString().toLowerCase();
+        const tag = this.normalizeSafetyTag(item.traffic_light);
         if (tag === 'safe') acc.safe += 1;
         else if (tag === 'caution') acc.caution += 1;
         else if (tag === 'avoid') acc.avoid += 1;
@@ -174,17 +178,32 @@ export class FoodSearchComponent implements OnInit {
   }
 
   pillClass(tag: FoodItem['traffic_light']): string {
-    const normalized = (tag ?? 'safe').toString().toLowerCase();
-    if (normalized === 'avoid') return 'avoid';
-    if (normalized === 'caution') return 'caution';
-    return 'safe';
+    return this.normalizeSafetyTag(tag);
   }
 
   pillLabel(tag: FoodItem['traffic_light']): string {
-    const normalized = (tag ?? 'safe').toString().toLowerCase();
+    const normalized = this.normalizeSafetyTag(tag);
     if (normalized === 'avoid') return 'Avoid';
     if (normalized === 'caution') return 'Caution';
     return 'Safe';
+  }
+
+  imageFor(food: FoodItem): string {
+    const raw = (food?.image_url ?? '').toString().trim();
+    return raw ? raw : this.defaultFoodImageUrl;
+  }
+
+  isPlaceholderImage(food: FoodItem): boolean {
+    const raw = (food?.image_url ?? '').toString().trim();
+    return !raw;
+  }
+
+  onFoodImageError(evt: Event): void {
+    const img = evt.target as HTMLImageElement | null;
+    if (!img) return;
+    if (img.dataset['fallbackApplied'] === '1') return;
+    img.dataset['fallbackApplied'] = '1';
+    img.src = this.defaultFoodImageUrl;
   }
 
   mealLabel(mealType: string | null | undefined): string {
@@ -214,6 +233,16 @@ export class FoodSearchComponent implements OnInit {
   vitaminKeys(food: FoodItem): string[] {
     const vitamins = food.vitamins ?? {};
     return Object.keys(vitamins).map((key) => `${key}: ${vitamins[key]}`);
+  }
+
+  private normalizeSafetyTag(tag: FoodItem['traffic_light']): 'safe' | 'caution' | 'avoid' {
+    const normalized = (tag ?? 'safe').toString().trim().toLowerCase();
+
+    if (normalized === 'avoid' || normalized === 'red' || normalized === 'danger') return 'avoid';
+    if (normalized === 'caution' || normalized === 'yellow' || normalized === 'warn' || normalized === 'warning') return 'caution';
+    if (normalized === 'safe' || normalized === 'green' || normalized === 'ok') return 'safe';
+
+    return 'safe';
   }
 
   toNumber(value: unknown): number {

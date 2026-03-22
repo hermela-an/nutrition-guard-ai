@@ -3,29 +3,31 @@
     <h2>BMI Calculator</h2>
     <p class="muted">Enter your height and weight to calculate BMI.</p>
 
-    <section class="card" style="margin-top:12px;">
-      <form [formGroup]="form">
-        <div class="field"><label>Height (cm)</label><input class="input" type="number" formControlName="height" placeholder="e.g. 160"></div>
-        <div class="field"><label>Weight (kg)</label><input class="input" type="number" formControlName="weight" placeholder="e.g. 56"></div>
-      </form>
-      <div class="spaced" style="justify-content:flex-start; margin-top:8px;">
-        <button class="btn primary" type="button" (click)="calculate()">Calculate BMI</button>
-        <button class="btn alt" type="button" (click)="reset()">Reset</button>
-      </div>
-      <div *ngIf="error" class="status err">Please enter valid height and weight values.</div>
-    </section>
+    <div class="bmi-layout" [class.has-result]="showResult">
+      <section class="card bmi-form">
+        <form [formGroup]="form">
+          <div class="field"><label>Height (cm)</label><input class="input" type="number" formControlName="height" placeholder="e.g. 160"></div>
+          <div class="field"><label>Weight (kg)</label><input class="input" type="number" formControlName="weight" placeholder="e.g. 56"></div>
+        </form>
+        <div class="spaced bmi-actions">
+          <button class="btn primary" type="button" (click)="calculate()">Calculate BMI</button>
+          <button class="btn alt" type="button" (click)="reset()">Reset</button>
+        </div>
+        <div *ngIf="error" class="status err">Please enter valid height and weight values.</div>
+      </section>
 
-    <section *ngIf="showResult" class="result-panel" style="margin-top:14px;">
-      <h3>Your Result</h3>
-      <p><strong>BMI:</strong> {{ bmi | number:'1.1-1' }}</p>
-      <p><strong>Category:</strong><span [class]="categoryClass">{{ category }}</span></p>
-      <p><strong>Healthy Weight Range:</strong> {{ minHealthy | number:'1.1-1' }} kg - {{ maxHealthy | number:'1.1-1' }} kg</p>
+      <section *ngIf="showResult" class="card result-panel bmi-result">
+        <h3>Your Result</h3>
+        <p><strong>BMI:</strong> {{ bmi | number:'1.1-1' }}</p>
+        <p><strong>Category:</strong><span [class]="categoryClass">{{ category }}</span></p>
+        <p><strong>Healthy Weight Range:</strong> {{ minHealthy | number:'1.1-1' }} kg - {{ maxHealthy | number:'1.1-1' }} kg</p>
 
-      <div class="bmi-scale">
-        <div class="bmi-track"><span class="bmi-marker" [style.left.%]="marker"></span></div>
-        <div class="bmi-labels"><span>Underweight</span><span>Normal</span><span>Overweight</span><span>Obese</span></div>
-      </div>
-    </section>
+        <div class="bmi-scale">
+          <div class="bmi-track"><span class="bmi-marker" [style.left.%]="marker"></span></div>
+          <div class="bmi-labels"><span>Underweight</span><span>Normal</span><span>Overweight</span><span>Obese</span></div>
+        </div>
+      </section>
+    </div>
 
     <section class="card" style="margin-top:14px;">
       <h3>BMI Categories</h3>

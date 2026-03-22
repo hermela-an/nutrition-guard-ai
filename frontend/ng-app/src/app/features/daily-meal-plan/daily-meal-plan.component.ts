@@ -47,6 +47,8 @@ export class DailyMealPlanComponent {
   private readonly profiles = inject(ProfileService);
   private readonly cdr = inject(ChangeDetectorRef);
 
+  private readonly intakeStoragePrefix = 'ng:intake:daily:';
+
   loading = true;
   error = '';
 
@@ -116,14 +118,15 @@ export class DailyMealPlanComponent {
     ).subscribe({
       next: ({ targets, plan }) => {
         this.totals.targetCalories = Math.round(targets.target_calories ?? 0);
-        this.totals.totalRecommended = Number(plan.progress?.total ?? 0);
-        this.totals.eatenRecommended = Number(plan.progress?.eaten ?? 0);
 
         this.meals = [
           this.toMeal('Breakfast', '07:30', 'breakfast', plan.breakfast ?? []),
           this.toMeal('Lunch', '12:45', 'lunch', plan.lunch ?? []),
           this.toMeal('Dinner', '19:00', 'dinner', plan.dinner ?? [])
         ];
+
+        this.applyLocalIntakeFallback(plan);
+        this.recomputeEatenTotals();
 
         this.totals.plannedCalories = this.meals.reduce((sum, meal) => sum + meal.targetCalories, 0);
         this.totals.protein = 0;
@@ -161,6 +164,11 @@ export class DailyMealPlanComponent {
 
     const next = !item.eaten;
     item.eaten = next;
+    this.totals.eatenRecommended = Math.max(
+      0,
+      Math.min(this.totals.totalRecommended, this.totals.eatenRecommended + (next ? 1 : -1))
+    );
+    this.persistLocalIntake(mealType, item.id, next);
     this.cdr.detectChanges();
 
     this.api.put<{ progress?: { total: number; eaten: number } }>('/api/meal-plan/intake', {
@@ -169,17 +177,70 @@ export class DailyMealPlanComponent {
       food_item_id: item.id,
       eaten: next
     }, this.auth.authHeaders()).subscribe({
-      next: (resp) => {
-        this.totals.totalRecommended = Number(resp?.progress?.total ?? this.totals.totalRecommended);
-        this.totals.eatenRecommended = Number(resp?.progress?.eaten ?? this.totals.eatenRecommended);
-        this.cdr.detectChanges();
-      },
+      next: () => {},
       error: () => {
         // rollback on error
         item.eaten = !next;
+        this.totals.eatenRecommended = Math.max(
+          0,
+          Math.min(this.totals.totalRecommended, this.totals.eatenRecommended + (next ? -1 : 1))
+        );
+        this.persistLocalIntake(mealType, item.id, !next);
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private recomputeEatenTotals(): void {
+    const all = this.meals.flatMap((m) => m.items ?? []);
+    this.totals.totalRecommended = all.length;
+    this.totals.eatenRecommended = all.reduce((sum, item) => sum + (item.eaten ? 1 : 0), 0);
+  }
+
+  private applyLocalIntakeFallback(plan: MealPlanResponse): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const storage = this.readLocalIntake(today);
+
+    const rawItems = [...(plan.breakfast ?? []), ...(plan.lunch ?? []), ...(plan.dinner ?? [])];
+    const serverProvidesEaten = rawItems.some((it) => Object.prototype.hasOwnProperty.call(it, 'eaten'));
+    if (serverProvidesEaten) return;
+
+    for (const meal of this.meals) {
+      for (const item of meal.items) {
+        const key = this.intakeKey(item.meal_type, item.id);
+        if (storage[key] === true) item.eaten = true;
+        else if (storage[key] === false) item.eaten = false;
+      }
+    }
+  }
+
+  private intakeKey(mealType: string, foodId: number): string {
+    return `${mealType}:${foodId}`;
+  }
+
+  private readLocalIntake(date: string): Record<string, boolean> {
+    const key = `${this.intakeStoragePrefix}${date}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, boolean>;
+      return {};
+    } catch {
+      return {};
+    }
+  }
+
+  private persistLocalIntake(mealType: string, foodId: number, eaten: boolean): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `${this.intakeStoragePrefix}${today}`;
+    const storage = this.readLocalIntake(today);
+    storage[this.intakeKey(mealType, foodId)] = eaten;
+    try {
+      localStorage.setItem(key, JSON.stringify(storage));
+    } catch {
+      // ignore storage failures
+    }
   }
 
   private formatPortion(item: MealItem): string {

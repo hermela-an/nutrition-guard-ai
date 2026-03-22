@@ -24,6 +24,16 @@ public class FoodRepository {
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          COALESCE(
+            to_jsonb(food_items)->>'definition',
+            to_jsonb(food_items)->>'description',
+            to_jsonb(food_items)->>'short_description'
+          ) AS definition,
+          COALESCE(
+            to_jsonb(food_items)->>'image_url',
+            to_jsonb(food_items)->>'imageUrl',
+            to_jsonb(food_items)->>'image'
+          ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
@@ -63,6 +73,16 @@ public class FoodRepository {
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          COALESCE(
+            to_jsonb(food_items)->>'definition',
+            to_jsonb(food_items)->>'description',
+            to_jsonb(food_items)->>'short_description'
+          ) AS definition,
+          COALESCE(
+            to_jsonb(food_items)->>'image_url',
+            to_jsonb(food_items)->>'imageUrl',
+            to_jsonb(food_items)->>'image'
+          ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
@@ -141,6 +161,8 @@ public class FoodRepository {
     return new JsonObject()
       .put("id", row.getInteger("id"))
       .put("food_name", row.getString("food_name"))
+      .put("definition", row.getString("definition"))
+      .put("image_url", row.getString("image_url"))
       .put("meal_type", row.getString("meal_type"))
       .put("portion_amount", row.getDouble("portion_amount"))
       .put("portion_unit", row.getString("portion_unit"))

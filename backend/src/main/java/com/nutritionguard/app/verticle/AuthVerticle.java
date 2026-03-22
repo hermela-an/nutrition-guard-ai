@@ -24,14 +24,34 @@ public class AuthVerticle extends AbstractVerticle {
 
     vertx.eventBus().consumer(EventAddresses.AUTH_REGISTER, msg -> {
       JsonObject body = (JsonObject) msg.body();
-      service.register(body.getString("email"), body.getString("password"))
+      if (body == null) {
+        msg.fail(400, "Invalid JSON body");
+        return;
+      }
+      String email = body.getString("email");
+      String password = body.getString("password");
+      if (email == null || email.isBlank() || password == null) {
+        msg.fail(400, "Missing required fields: email, password");
+        return;
+      }
+      service.register(email, password)
         .onSuccess(msg::reply)
         .onFailure(err -> msg.fail(400, err.getMessage()));
     });
 
     vertx.eventBus().consumer(EventAddresses.AUTH_LOGIN, msg -> {
       JsonObject body = (JsonObject) msg.body();
-      service.login(body.getString("email"), body.getString("password"))
+      if (body == null) {
+        msg.fail(400, "Invalid JSON body");
+        return;
+      }
+      String email = body.getString("email");
+      String password = body.getString("password");
+      if (email == null || email.isBlank() || password == null) {
+        msg.fail(400, "Missing required fields: email, password");
+        return;
+      }
+      service.login(email, password)
         .onSuccess(msg::reply)
         .onFailure(err -> msg.fail(401, err.getMessage()));
     });

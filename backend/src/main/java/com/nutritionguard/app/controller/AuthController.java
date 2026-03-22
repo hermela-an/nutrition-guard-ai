@@ -3,6 +3,7 @@ package com.nutritionguard.app.controller;
 import com.nutritionguard.app.util.EventAddresses;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.DeliveryOptions;
+import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 
@@ -15,17 +16,25 @@ public class AuthController {
 
   public void mount(Router router) {
     router.post("/api/auth/register").handler(ctx -> {
-      JsonObject body = ctx.body().asJsonObject();
+      JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
+      if (body == null) {
+        ctx.response().setStatusCode(400).end("Invalid JSON body");
+        return;
+      }
       request(EventAddresses.AUTH_REGISTER, body)
         .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
-        .onFailure(err -> ctx.response().setStatusCode(400).end(err.getMessage()));
+        .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 400)).end(messageFrom(err)));
     });
 
     router.post("/api/auth/login").handler(ctx -> {
-      JsonObject body = ctx.body().asJsonObject();
+      JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
+      if (body == null) {
+        ctx.response().setStatusCode(400).end("Invalid JSON body");
+        return;
+      }
       request(EventAddresses.AUTH_LOGIN, body)
         .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
-        .onFailure(err -> ctx.response().setStatusCode(401).end(err.getMessage()));
+        .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 401)).end(messageFrom(err)));
     });
   }
 
@@ -33,5 +42,23 @@ public class AuthController {
     return vertx.eventBus()
       .<JsonObject>request(address, body, new DeliveryOptions().setSendTimeout(5_000))
       .map(msg -> msg.body());
+  }
+
+  private int statusFrom(Throwable err, int fallback) {
+    if (err instanceof ReplyException re) {
+      return re.failureCode();
+    }
+    return fallback;
+  }
+
+  private String messageFrom(Throwable err) {
+    if (err instanceof ReplyException re) {
+      String msg = re.getMessage();
+      if (msg != null && !msg.isBlank()) {
+        return msg;
+      }
+    }
+    String msg = err.getMessage();
+    return msg == null ? "Request failed" : msg;
   }
 }

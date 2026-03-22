@@ -77,35 +77,49 @@
 
     <div class="results-grid" *ngIf="!loading && !error && filteredFoods.length > 0">
       <article class="food-card" *ngFor="let food of filteredFoods">
-        <div class="food-title">
-          <div>
-            <div class="name">{{ formatHeadline(food) }}</div>
-            <div class="meal-type">{{ mealLabel(food.meal_type) }}</div>
+        <div class="card-top">
+          <div class="media" [class.placeholder]="isPlaceholderImage(food)">
+            <img
+              class="thumb"
+              [src]="imageFor(food)"
+              (error)="onFoodImageError($event)"
+              [alt]="food.food_name + ' image'"
+              loading="lazy"
+            />
           </div>
-          <span class="pill" [ngClass]="pillClass(food.traffic_light)">{{ pillLabel(food.traffic_light) }}</span>
-        </div>
-        <div class="macro-row">
-          <div class="macro">
-            <span class="label">Calories</span>
-            <span class="value">{{ food.calories | number:'1.0-0' }}</span>
+
+          <div class="content">
+            <div class="title-row">
+              <div class="title-text">
+                <div class="food-name">{{ food.food_name }}</div>
+                <div class="food-meta">
+                  <span class="portion">{{ formatPortion(food) }}</span>
+                  <span class="dot">&middot;</span>
+                  <span class="calories">{{ food.calories | number:'1.0-0' }} kcal</span>
+                  <ng-container *ngIf="food.meal_type">
+                    <span class="dot">&middot;</span>
+                    <span class="meal-tag">{{ mealLabel(food.meal_type) }}</span>
+                  </ng-container>
+                </div>
+              </div>
+              <span class="pill" [ngClass]="pillClass(food.traffic_light)">{{ pillLabel(food.traffic_light) }}</span>
+            </div>
+
+            <div class="macro-strip" aria-label="Macronutrients">
+              <div class="macro-chip">
+                <span class="label">Protein</span>
+                <span class="value">{{ toNumber(food.protein_g) | number:'1.0-0' }}g</span>
+              </div>
+              <div class="macro-chip">
+                <span class="label">Carbs</span>
+                <span class="value">{{ toNumber(food.carbs_g) | number:'1.0-0' }}g</span>
+              </div>
+              <div class="macro-chip">
+                <span class="label">Fat</span>
+                <span class="value">{{ toNumber(food.fat_g) | number:'1.0-0' }}g</span>
+              </div>
+            </div>
           </div>
-          <div class="macro">
-            <span class="label">Protein</span>
-            <span class="value">{{ toNumber(food.protein_g) | number:'1.0-0' }}g</span>
-          </div>
-          <div class="macro">
-            <span class="label">Carbs</span>
-            <span class="value">{{ toNumber(food.carbs_g) | number:'1.0-0' }}g</span>
-          </div>
-          <div class="macro">
-            <span class="label">Fat</span>
-            <span class="value">{{ toNumber(food.fat_g) | number:'1.0-0' }}g</span>
-          </div>
-        </div>
-        <div class="micro-row">
-          <span>Sugar {{ toNumber(food.sugar_g) | number:'1.0-0' }}g</span>
-          <span>Sodium {{ toNumber(food.sodium_mg) | number:'1.0-0' }}mg</span>
-          <span>Cholesterol {{ toNumber(food.cholesterol_mg) | number:'1.0-0' }}mg</span>
         </div>
 
         <button
