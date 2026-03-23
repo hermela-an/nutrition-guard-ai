@@ -117,14 +117,24 @@ public class FoodRepository {
     int safeLimit = Math.max(1, Math.min(limit, 100));
 
     String sql = """
-      WITH scored AS (
+      WITH normalized AS (
+        SELECT
+          id,
+          COALESCE(
+            to_jsonb(food_items)->>'food_name',
+            to_jsonb(food_items)->>'name'
+          ) AS food_name,
+          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins
+        FROM food_items
+      ),
+      scored AS (
         SELECT
           id,
           food_name,
           vitamins,
           vitamins->>$1 AS vitamin_value,
           NULLIF(regexp_replace(COALESCE(vitamins->>$1, ''), '[^0-9\\\\.]', '', 'g'), '')::numeric AS vitamin_score
-        FROM food_items
+        FROM normalized
         WHERE vitamins ? $1
       )
       SELECT id, food_name, vitamins, vitamin_value

@@ -39,7 +39,7 @@ interface SuggestionChip {
     <div class="chat-window" [class.open]="isOpen">
       <div class="chat-header">
         <div class="chat-header-info">
-          <div class="chat-avatar">✨</div>
+          <div class="chat-avatar" aria-label="NutritionGuard AI">NG</div>
           <div>
             <h3>NutriGuard AI</h3>
             <span class="status-indicator">Always online</span>
@@ -48,13 +48,24 @@ interface SuggestionChip {
       </div>
 
       <div class="chat-body" #chatBody>
+        <!-- Session gate: always treat as a new session unless the user chooses Go Back -->
+        <div class="chat-empty-state" *ngIf="sessionGateOpen">
+          <div class="empty-icon" aria-hidden="true">&#128075;</div>
+          <p>Welcome back! Do you want to continue where you left off or start a new conversation?</p>
+          <div class="suggestion-chips session-actions">
+            <button type="button" (click)="restorePreviousSession()" [disabled]="!hasPreviousSession">Go Back</button>
+            <button type="button" class="primary" (click)="startFresh()">Start Fresh</button>
+          </div>
+          <span class="muted" *ngIf="!hasPreviousSession">No previous session found.</span>
+        </div>
+
         <!-- Welcome / placeholder if no messages exist -->
-        <div class="chat-empty-state" *ngIf="messages.length === 0">
-          <div class="empty-icon">👋</div>
+        <div class="chat-empty-state" *ngIf="!sessionGateOpen && messages.length === 0">
+          <div class="empty-icon" aria-hidden="true">&#128075;</div>
           <p>Hi there! I'm your personal nutrition assistant.</p>
           <span class="muted">Ask me about your diet, meals, or vitamin suggestions.</span>
           
-          <div class="suggestion-chips">
+          <div class="suggestion-chips quick-picks" aria-label="Quick questions">
             <button
               type="button"
               *ngFor="let chip of suggestionChips"
@@ -100,20 +111,35 @@ interface SuggestionChip {
       </div>
 
       <div class="chat-footer">
-        <input 
-          type="text" 
-          [(ngModel)]="currentInput" 
-          (keyup.enter)="sendMessage()"
-          placeholder="Ask a nutrition question..." 
-          class="chat-input"
-          [disabled]="isTyping"
-        >
-        <button class="send-btn" (click)="sendMessage()" [disabled]="!currentInput.trim() || isTyping">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
+        <div class="quick-bar" *ngIf="!sessionGateOpen && messages.length > 0" aria-label="Quick vitamin shortcuts">
+          <span class="quick-bar-label">Quick vitamins</span>
+          <div class="quick-bar-chips">
+            <button
+              type="button"
+              *ngFor="let chip of quickBarChips"
+              (click)="quickAsk(chip.question, chip.vitaminKey)"
+            >
+              {{ chip.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="chat-input-row">
+          <input 
+            type="text" 
+            [(ngModel)]="currentInput" 
+            (keyup.enter)="sendMessage()"
+            placeholder="Ask a nutrition question..." 
+            class="chat-input"
+            [disabled]="isTyping || sessionGateOpen"
+          >
+          <button class="send-btn" (click)="sendMessage()" [disabled]="!currentInput.trim() || isTyping || sessionGateOpen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   `,
@@ -198,6 +224,9 @@ interface SuggestionChip {
       align-items: center;
       justify-content: center;
       font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: var(--brand);
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
@@ -243,8 +272,17 @@ interface SuggestionChip {
     }
 
     .empty-icon {
-      font-size: 32px;
-      margin-bottom: 12px;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid #e6ede3;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
     }
 
     .chat-empty-state p {
@@ -258,27 +296,53 @@ interface SuggestionChip {
     }
 
     .suggestion-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      width: 100%;
+      max-width: 320px;
+      margin: 16px auto 0;
     }
 
     .suggestion-chips button {
       background: white;
       border: 1px solid #d8dfcf;
-      padding: 6px 12px;
+      padding: 10px 12px;
       border-radius: 999px;
       font-size: 12px;
       color: var(--brand);
       cursor: pointer;
       transition: all 0.2s;
+      width: 100%;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.2;
+      min-height: 38px;
+    }
+
+    @media (max-width: 360px) {
+      .suggestion-chips {
+        grid-template-columns: 1fr;
+        max-width: 260px;
+      }
     }
 
     .suggestion-chips button:hover {
       background: #f4f7f3;
       border-color: #2e9f61;
+    }
+
+    .suggestion-chips.session-actions button.primary {
+      background: var(--brand);
+      border-color: rgba(46, 159, 97, 0.35);
+      color: #fff;
+    }
+
+    .suggestion-chips.session-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      max-width: none;
     }
 
     .message {
@@ -342,8 +406,58 @@ interface SuggestionChip {
       background: white;
       border-top: 1px solid #e6ede3;
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .chat-input-row {
+      display: flex;
       gap: 8px;
       align-items: center;
+      width: 100%;
+    }
+
+    .quick-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .quick-bar-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+
+    .quick-bar-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    .quick-bar-chips button {
+      flex: 0 0 auto;
+      background: #f4f7f3;
+      border: 1px solid #d8dfcf;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--brand);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .quick-bar-chips button:hover {
+      background: #ffffff;
+      border-color: #2e9f61;
     }
 
     .chat-input {
@@ -438,6 +552,8 @@ interface SuggestionChip {
   `]
 })
 export class FloatingChatComponent implements AfterViewChecked {
+  private static readonly SESSION_STORAGE_KEY = 'ng_chat_previous_session_v1';
+
   @ViewChild('chatBody') private chatBody!: ElementRef;
 
   private readonly api = inject(ApiService);
@@ -448,6 +564,11 @@ export class FloatingChatComponent implements AfterViewChecked {
   isTyping = false;
   currentInput = '';
   shouldScroll = false;
+
+  sessionGateOpen = false;
+  hasPreviousSession = false;
+  private sessionChoice: 'go_back' | 'start_fresh' | null = null;
+  private previousSessionMessages: ChatMessage[] = [];
 
   readonly suggestionChips: SuggestionChip[] = [
     {
@@ -517,6 +638,39 @@ export class FloatingChatComponent implements AfterViewChecked {
     }
   ];
 
+  readonly quickBarChips: SuggestionChip[] = [
+    {
+      label: 'Vitamin A',
+      vitaminKey: 'vitamin_a',
+      question: 'Show me foods in our database rich in Vitamin A.'
+    },
+    {
+      label: 'Vitamin D',
+      vitaminKey: 'vitamin_d',
+      question: 'Show me foods in our database rich in Vitamin D.'
+    },
+    {
+      label: 'Vitamin C',
+      vitaminKey: 'vitamin_c',
+      question: 'Show me foods in our database rich in Vitamin C (Ascorbic Acid).'
+    },
+    {
+      label: 'Vitamin B12',
+      vitaminKey: 'vitamin_b12',
+      question: 'Show me foods in our database rich in Vitamin B12 (Cobalamin).'
+    },
+    {
+      label: 'Folate (B9)',
+      vitaminKey: 'vitamin_b9',
+      question: 'Show me foods in our database rich in Vitamin B9 (Folate / Folic Acid).'
+    },
+    {
+      label: 'Vitamin E',
+      vitaminKey: 'vitamin_e',
+      question: 'Show me foods in our database rich in Vitamin E.'
+    }
+  ];
+
   readonly fallbackImageUrl =
     'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80';
 
@@ -531,9 +685,49 @@ export class FloatingChatComponent implements AfterViewChecked {
 
   toggleChat(): void {
     this.isOpen = !this.isOpen;
+    if (this.isOpen) {
+      this.enterChatSession();
+    }
     if (this.isOpen && this.messages.length > 0) {
       this.shouldScroll = true;
     }
+  }
+
+  private enterChatSession(): void {
+    // Persist whatever is currently visible so it can be restored via "Go Back".
+    if (this.messages.length > 0) {
+      this.persistPreviousSession(this.messages);
+    }
+
+    this.previousSessionMessages = this.loadPreviousSession();
+    this.hasPreviousSession = this.previousSessionMessages.length > 0;
+
+    // Always behave as a new session until the user explicitly chooses "Go Back".
+    this.sessionChoice = null;
+    this.sessionGateOpen = true;
+    this.messages = [];
+    this.currentInput = '';
+    this.isTyping = false;
+    this.shouldScroll = true;
+  }
+
+  restorePreviousSession(): void {
+    if (!this.hasPreviousSession) return;
+    this.messages = this.previousSessionMessages.map(m => ({ ...m }));
+    this.sessionChoice = 'go_back';
+    this.sessionGateOpen = false;
+    this.shouldScroll = true;
+  }
+
+  startFresh(): void {
+    this.clearPreviousSession();
+    this.previousSessionMessages = [];
+    this.hasPreviousSession = false;
+    this.messages = [];
+    this.sessionChoice = 'start_fresh';
+    this.sessionGateOpen = false;
+    this.currentInput = '';
+    this.shouldScroll = true;
   }
 
   quickAsk(question: string, vitaminKey?: string): void {
@@ -549,6 +743,7 @@ export class FloatingChatComponent implements AfterViewChecked {
 
   private sendMessageWithPayload(text: string, extra?: Record<string, unknown>): void {
     if (!text || this.isTyping) return;
+    if (this.sessionGateOpen) return;
 
     // Add user message to UI immediately
     this.messages.push({
@@ -556,6 +751,7 @@ export class FloatingChatComponent implements AfterViewChecked {
       isUser: true,
       time: new Date()
     });
+    this.persistIfChosen();
     
     this.isTyping = true;
     this.shouldScroll = true;
@@ -577,6 +773,7 @@ export class FloatingChatComponent implements AfterViewChecked {
             imageErrored: false,
             imageRetryCount: 0
           });
+          this.persistIfChosen();
           this.shouldScroll = true;
           this.cdr.detectChanges();
         },
@@ -587,10 +784,59 @@ export class FloatingChatComponent implements AfterViewChecked {
             isUser: false,
             time: new Date()
           });
+          this.persistIfChosen();
           this.shouldScroll = true;
           this.cdr.detectChanges();
         }
       });
+  }
+
+  private persistIfChosen(): void {
+    // Once the user chooses "Start Fresh" or "Go Back", persist the active conversation
+    // so it can be restored next time via the session gate.
+    if (!this.sessionChoice) return;
+    this.persistPreviousSession(this.messages);
+  }
+
+  private persistPreviousSession(messages: ChatMessage[]): void {
+    try {
+      const payload = messages.map(m => ({
+        ...m,
+        time: (m.time instanceof Date ? m.time : new Date(m.time)).toISOString()
+      }));
+      localStorage.setItem(FloatingChatComponent.SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors (e.g., private mode / storage disabled).
+    }
+  }
+
+  private loadPreviousSession(): ChatMessage[] {
+    try {
+      const raw = localStorage.getItem(FloatingChatComponent.SESSION_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as Array<Omit<ChatMessage, 'time'> & { time: string }>;
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(m => typeof m?.text === 'string' && typeof m?.isUser === 'boolean')
+        .map(m => ({
+          text: m.text,
+          isUser: m.isUser,
+          time: new Date(m.time),
+          imageUrl: m.imageUrl,
+          imageErrored: m.imageErrored,
+          imageRetryCount: m.imageRetryCount
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  private clearPreviousSession(): void {
+    try {
+      localStorage.removeItem(FloatingChatComponent.SESSION_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
   }
 
   formatText(text: string): string {

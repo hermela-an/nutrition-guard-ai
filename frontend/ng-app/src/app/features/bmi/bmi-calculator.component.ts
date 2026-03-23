@@ -67,9 +67,28 @@ export class BmiCalculatorComponent {
     this.minHealthy = 18.5 * h * h;
     this.maxHealthy = 24.9 * h * h;
     this.category = this.bmi < 18.5 ? 'Underweight' : this.bmi < 25 ? 'Normal weight' : this.bmi < 30 ? 'Overweight' : 'Obese';
-    const normalized = Math.max(14, Math.min(40, this.bmi));
-    this.marker = ((normalized - 14) / (40 - 14)) * 100;
+    this.marker = this.markerForBmi(this.bmi);
     this.showResult = true;
+  }
+
+  private markerForBmi(bmi: number): number {
+    if (!Number.isFinite(bmi)) return 0;
+
+    const clamped = Math.max(14, Math.min(40, bmi));
+
+    // The UI shows 4 evenly spaced category labels, so map each category range
+    // into a 25% segment of the track.
+    if (clamped < 18.5) return this.scale(clamped, 14, 18.5, 0, 25);
+    if (clamped < 25) return this.scale(clamped, 18.5, 25, 25, 50);
+    if (clamped < 30) return this.scale(clamped, 25, 30, 50, 75);
+    return this.scale(clamped, 30, 40, 75, 100);
+  }
+
+  private scale(value: number, inMin: number, inMax: number, outMin: number, outMax: number): number {
+    if (inMax <= inMin) return outMin;
+    const t = (value - inMin) / (inMax - inMin);
+    const clampedT = Math.max(0, Math.min(1, t));
+    return outMin + clampedT * (outMax - outMin);
   }
 
   reset(): void {
