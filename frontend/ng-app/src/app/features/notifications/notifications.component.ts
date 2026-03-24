@@ -16,7 +16,15 @@ export class NotificationsComponent implements OnInit, OnDestroy {
 
   unreadOnly = true;
   loading = false;
+  loadingMore = false;
+  errorMessage: string | null = null;
   items: NotificationItem[] = [];
+  unreadCount = 0;
+
+  private readonly limit = 25;
+  private offset = 0;
+  hasMore = false;
+  expandedId: number | null = null;
 
   menuItems = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -33,6 +41,7 @@ export class NotificationsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.refresh();
+    this.sub.add(this.notifications.unreadCount$.subscribe((count) => (this.unreadCount = count)));
     this.sub.add(
       timer(0, 15000)
         .pipe(switchMap(() => this.notifications.refreshUnreadCount()))
@@ -46,35 +55,93 @@ export class NotificationsComponent implements OnInit, OnDestroy {
 
   refresh(): void {
     this.loading = true;
-    this.notifications.list({ unreadOnly: this.unreadOnly, limit: 100 }).subscribe({
+    this.errorMessage = null;
+    this.offset = 0;
+    this.hasMore = false;
+    this.expandedId = null;
+    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: 0 }).subscribe({
       next: (items) => {
-        this.items = items ?? [];
+        const nextItems = items ?? [];
+        this.items = nextItems;
+        this.offset = nextItems.length;
+        this.hasMore = nextItems.length === this.limit;
         this.loading = false;
       },
       error: () => {
+        this.errorMessage = 'Failed to load notifications. Please try again.';
         this.loading = false;
       }
     });
   }
 
-  toggleUnreadOnly(): void {
-    this.unreadOnly = !this.unreadOnly;
+  setUnreadOnly(unreadOnly: boolean): void {
+    if (this.unreadOnly === unreadOnly) return;
+    this.unreadOnly = unreadOnly;
     this.refresh();
   }
 
   markAllRead(): void {
+    this.loading = true;
+    this.errorMessage = null;
     this.notifications.markAllRead().subscribe({
       next: () => this.refresh(),
-      error: () => this.refresh()
+      error: () => {
+        this.errorMessage = 'Failed to mark all as read. Please try again.';
+        this.loading = false;
+      }
     });
   }
 
   markRead(item: NotificationItem): void {
     if (!item?.id || item.is_read) return;
     this.notifications.markRead([item.id]).subscribe({
-      next: () => this.refresh(),
-      error: () => this.refresh()
+      next: (updated) => {
+        if (updated > 0) {
+          if (this.unreadOnly) {
+            this.refresh();
+            return;
+          }
+          item.is_read = true;
+        }
+      },
+      error: () => {
+        this.errorMessage = 'Failed to mark notification as read.';
+      }
     });
   }
-}
 
+  toggleExpanded(item: NotificationItem): void {
+    const id = item?.id ?? null;
+    if (!id) return;
+    this.expandedId = this.expandedId === id ? null : id;
+  }
+
+  loadMore(): void {
+    if (this.loadingMore || this.loading || !this.hasMore) return;
+    this.loadingMore = true;
+    this.errorMessage = null;
+    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: this.offset }).subscribe({
+      next: (items) => {
+        const nextItems = items ?? [];
+        this.items = [...this.items, ...nextItems];
+        this.offset += nextItems.length;
+        this.hasMore = nextItems.length === this.limit;
+        this.loadingMore = false;
+      },
+      error: () => {
+        this.errorMessage = 'Failed to load more notifications.';
+        this.loadingMore = false;
+      }
+    });
+  }
+
+  formatDataValue(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+}

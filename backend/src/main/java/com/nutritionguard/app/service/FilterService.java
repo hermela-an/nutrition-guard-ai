@@ -53,7 +53,7 @@ public class FilterService {
       }
       JsonObject item = input.getJsonObject(i);
       String light = TrafficLightUtil.evaluate(health, item);
-      if (!"RED".equals(light)) {
+      if ("GREEN".equalsIgnoreCase(light) || "SAFE".equalsIgnoreCase(light)) {
         item.put("traffic_light", light);
         safe.add(item);
       }

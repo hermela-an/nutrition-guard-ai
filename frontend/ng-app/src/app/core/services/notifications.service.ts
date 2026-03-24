@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { map, switchMap, tap } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { AuthService } from './auth.service';
 
@@ -45,7 +45,7 @@ export class NotificationsService {
       .post<{ updated: number }>(`/api/notifications/mark-read`, {}, this.auth.authHeaders())
       .pipe(
         map((r) => Number(r?.updated ?? 0)),
-        tap(() => void this.refreshUnreadCount().subscribe())
+        switchMap((updated) => this.refreshUnreadCount().pipe(map(() => updated)))
       );
   }
 
@@ -54,8 +54,7 @@ export class NotificationsService {
       .post<{ updated: number }>(`/api/notifications/mark-read`, { ids }, this.auth.authHeaders())
       .pipe(
         map((r) => Number(r?.updated ?? 0)),
-        tap(() => void this.refreshUnreadCount().subscribe())
+        switchMap((updated) => this.refreshUnreadCount().pipe(map(() => updated)))
       );
   }
 }
-

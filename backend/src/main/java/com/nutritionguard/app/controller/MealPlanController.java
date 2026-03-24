@@ -40,7 +40,6 @@ public class MealPlanController {
         .compose(plan -> tracking.intakeMap(userId, today).map(map -> enrichWithIntake(plan, map)))
         .compose(plan -> tracking.progress(userId, today).map(progress -> plan.put("progress", progress)))
         .onSuccess(plan -> {
-          maybeNotifyPlan(userId, plan);
           maybeNotifyUneatenReminders(userId, plan, today);
           ctx.response().putHeader("Content-Type", "application/json").end(plan.encode());
         })
@@ -93,28 +92,6 @@ public class MealPlanController {
     }
   }
 
-  private void maybeNotifyPlan(String userId, JsonObject plan) {
-    if (plan == null) return;
-
-    int yellow = countByTrafficLight(plan, "YELLOW");
-    int red = countByTrafficLight(plan, "RED");
-
-    if (red <= 0 && yellow <= 0) return;
-
-    String title = red > 0 ? "Meal plan alert" : "Meal plan caution";
-    String message = red > 0
-      ? "Your meal plan contains foods flagged as RED for your health profile. Consider safer alternatives."
-      : "Your meal plan contains some YELLOW (caution) foods. Review portions and your health conditions.";
-
-    notifications.create(
-      userId,
-      NotificationService.TYPE_ALERT,
-      title,
-      message,
-      new JsonObject().put("red_count", red).put("yellow_count", yellow)
-    ).onFailure(err -> err.printStackTrace());
-  }
-
   private void maybeNotifyUneatenReminders(String userId, JsonObject plan, LocalDate date) {
     if (plan == null) return;
     JsonObject progress = plan.getJsonObject("progress", new JsonObject());
@@ -133,31 +110,9 @@ public class MealPlanController {
       key,
       NotificationService.TYPE_ALERT,
       "Meal plan reminder",
-      "You still have recommended foods not marked as eaten today. Update your intake to keep tracking accurate.",
+      "You haven't updated your meals today. Please log your intake.",
       new JsonObject().put("date", date.toString()).put("total", total).put("eaten", eaten)
     ).onFailure(err -> err.printStackTrace());
-  }
-
-  private int countByTrafficLight(JsonObject plan, String level) {
-    int count = 0;
-    count += countInArray(plan.getJsonArray("breakfast"), level);
-    count += countInArray(plan.getJsonArray("lunch"), level);
-    count += countInArray(plan.getJsonArray("dinner"), level);
-    count += countInArray(plan.getJsonArray("snacks"), level);
-    count += countInArray(plan.getJsonArray("snack"), level);
-    return count;
-  }
-
-  private int countInArray(JsonArray items, String level) {
-    if (items == null || items.isEmpty()) return 0;
-    int count = 0;
-    for (int i = 0; i < items.size(); i++) {
-      JsonObject item = items.getJsonObject(i);
-      if (item != null && level.equalsIgnoreCase(item.getString("traffic_light"))) {
-        count++;
-      }
-    }
-    return count;
   }
 
   private int statusFrom(Throwable err, int fallback) {

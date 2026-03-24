@@ -22,6 +22,30 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.count-pill {
+  font-size: 12px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #d8dfcf;
+  background: #f4f7f3;
+  color: #475a4b;
+}
+
+.filters {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .card {
@@ -30,6 +54,13 @@
   border-radius: 14px;
   padding: 16px;
   margin-top: 12px;
+}
+
+.card.error {
+  border-color: #f2c0c0;
+  background: #fde8e8;
+  color: #8e2f2f;
+  font-weight: 800;
 }
 
 .list {
@@ -70,6 +101,37 @@
   color: #475a4b;
 }
 
+.notif-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.data {
+  margin-top: 12px;
+  border-top: 1px dashed #d8dfcf;
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.data-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) 1fr;
+  gap: 10px;
+}
+
+.k {
+  font-weight: 900;
+  color: #475a4b;
+}
+
+.v {
+  color: #475a4b;
+  word-break: break-word;
+}
+
 .pill {
   font-size: 11px;
   font-weight: 800;
@@ -96,9 +158,20 @@
   cursor: pointer;
 }
 
+.btn.small {
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
 .btn.ghost {
   background: white;
   color: #475a4b;
+}
+
+.btn.ghost.active {
+  background: #f4f7f3;
+  border-color: #cdd6c4;
 }
 
 .btn.danger {
@@ -106,3 +179,7 @@
   border-color: #d64545;
 }
 
+.load-more {
+  display: flex;
+  justify-content: center;
+}

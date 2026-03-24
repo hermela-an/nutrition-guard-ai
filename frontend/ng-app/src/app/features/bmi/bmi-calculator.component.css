@@ -41,3 +41,11 @@
     grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
   }
 }
+
+.bmi-cta {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
