@@ -6,7 +6,9 @@ The error you encountered was caused by **Docker Desktop not running**, which me
 
 ## The Fix
 
-I've updated the `backend/start-backend.ps1` script to automatically:
+I've updated the `backend/start-backend.ps1` script to support both:
+- **Local Postgres** (no Docker), using `backend/.env.local`
+- **Docker Postgres**, using `backend/.env`
 
 1. **Check if Docker Desktop is running**
 2. **Start Docker Desktop if needed**
@@ -16,17 +18,28 @@ I've updated the `backend/start-backend.ps1` script to automatically:
 
 ## How to Start the System
 
-### Option 1: Use the Updated Script (Recommended)
+### Option 1: Local Postgres (No Docker) (Recommended)
 ```powershell
-# Navigate to the backend directory
 cd backend
 
-# Run the startup script
+# 1) Configure backend/.env.local (copy from backend/.env.local.example)
+# 2) Initialize schema + seed in your local Postgres
+.\init-local-db.ps1
+
+# 3) Start backend (auto-detects .env.local and skips Docker)
 .\start-backend.ps1
 ```
 
-### Option 2: Manual Startup
-If you prefer to start everything manually:
+### Option 2: Docker Postgres
+```powershell
+cd backend
+
+# Forces Docker mode (uses backend/.env and starts containers)
+.\start-backend.ps1 -Db docker
+```
+
+### Option 3: Manual Docker Startup
+If you prefer to start Docker manually:
 
 1. **Start Docker Desktop** (from Start Menu or run: `C:\Program Files\Docker\Docker\Docker Desktop.exe`)
 
@@ -38,10 +51,10 @@ docker-compose up -d postgres
 
 3. **Wait for database to be ready** (check with: `docker-compose logs postgres`)
 
-4. **Start the backend**
+4. **Start the backend (Docker mode)**
 ```powershell
 cd backend
-.\start-backend.ps1
+.\start-backend.ps1 -Db docker
 ```
 
 ## What the Script Does
@@ -49,7 +62,7 @@ cd backend
 1. **Checks Docker Desktop**: Verifies Docker is running
 2. **Starts Database**: Runs `docker-compose up -d postgres`
 3. **Waits for Database**: Waits up to 30 seconds for PostgreSQL to be ready
-4. **Loads Environment Variables**: Reads from `.env` file
+4. **Loads Environment Variables**: Reads from `.env.local` (local) or `.env` (docker)
 5. **Starts Backend**: Runs `mvn exec:java`
 
 ## Expected Output
@@ -122,6 +135,20 @@ Once the backend is running on port 8080, you can:
 - Access the frontend at `http://localhost:4200` (if using Angular dev server)
 - Test the API endpoints
 - Start developing new features
+
+### Admin Dashboard
+If you log in with an **ADMIN** account, you’ll be redirected to the admin console:
+- Frontend routes: `/admin/overview`, `/admin/users`, `/admin/foods`, `/admin/alerts`
+- Backend endpoints: `GET /api/admin/stats`, `GET /api/admin/analytics/food-searches`, `GET/PUT/DELETE /api/admin/users`, `GET/POST/PUT/DELETE /api/admin/foods`
+
+To make a specific email an admin, set `ADMIN_EMAILS` in `backend/.env` (Docker) or `backend/.env.local` (local), restart the backend, then log in again.
+
+If you still see **"Admin access required"**, promote the user directly in your local database:
+```powershell
+cd backend
+.\make-admin.ps1 -Email "youradmin@email.com"
+```
+Then log out/in again so a new token is issued.
 
 ## Contact
 

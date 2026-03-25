@@ -1,0 +1,75 @@
+<div class="page-header">
+  <div>
+    <div class="eyebrow">Admin</div>
+    <h2>Overview</h2>
+    <p class="muted">A quick snapshot of users, foods, and safety alerts.</p>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn ghost" (click)="refresh()">Refresh</button>
+  </div>
+</div>
+
+<div class="card error" *ngIf="error">{{ error }}</div>
+
+<div class="grid-4" style="margin-top:12px;" *ngIf="!loading">
+  <div class="card">
+    <small class="muted">Total Users</small>
+    <div class="stat-value">{{ stats.total_users | number:'1.0-0' }}</div>
+    <span class="pill safe">Registered</span>
+  </div>
+  <div class="card">
+    <small class="muted">Total Foods</small>
+    <div class="stat-value">{{ stats.total_foods | number:'1.0-0' }}</div>
+    <span class="pill safe">In database</span>
+  </div>
+  <div class="card">
+    <small class="muted">Avoid (Risk)</small>
+    <div class="stat-value">{{ stats.avoid_foods | number:'1.0-0' }}</div>
+    <span class="pill avoid">High risk</span>
+  </div>
+  <div class="card">
+    <small class="muted">Caution</small>
+    <div class="stat-value">{{ stats.caution_foods | number:'1.0-0' }}</div>
+    <span class="pill caution">Review</span>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-top:12px;" *ngIf="!loading">
+  <div class="card">
+    <div class="card-head">
+      <h3>Activity</h3>
+      <span class="muted">Food searches (last 14 days)</span>
+    </div>
+    <div class="chart-box">
+      <svg class="spark" viewBox="0 0 100 40" preserveAspectRatio="none" *ngIf="searchLinePoints; else noData">
+        <path class="spark-area" [attr.d]="searchAreaPath"></path>
+        <polyline class="spark-line" [attr.points]="searchLinePoints"></polyline>
+      </svg>
+      <ng-template #noData>
+        <div class="muted">No activity yet. Search a food in the user app to populate this chart.</div>
+      </ng-template>
+    </div>
+    <div class="muted small" style="margin-top:10px;">
+      Total: <strong>{{ searchTotal }}</strong> · Peak/day: <strong>{{ searchMax }}</strong>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Risky Food Alerts</h3>
+      <span class="muted">Foods marked as Avoid</span>
+    </div>
+
+    <div class="empty muted" *ngIf="riskyFoods.length === 0">No risky foods found.</div>
+
+    <div class="mini-cards" *ngIf="riskyFoods.length > 0">
+      <div class="mini-card" *ngFor="let f of riskyFoods">
+        <div class="mini-card-main">
+          <strong>{{ f.food_name }}</strong>
+          <span class="muted">{{ f.calories | number:'1.0-0' }} cal · {{ f.meal_type }}</span>
+        </div>
+        <span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ (f.traffic_light || 'GREEN') }}</span>
+      </div>
+    </div>
+  </div>
+</div>

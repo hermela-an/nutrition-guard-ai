@@ -1,5 +1,5 @@
 # Initializes the NutritionGuard schema in your local Postgres database.
-# Reads connection settings from .env.local and runs the schema migration into DB_SCHEMA (default: ng).
+# Reads connection settings from .env.local and runs migrations into DB_SCHEMA (default: public).
 
 $envFile = Join-Path $PSScriptRoot ".env.local"
 
@@ -25,17 +25,24 @@ $dbName = $env:DB_NAME
 $dbUser = $env:DB_USER
 $dbPassword = $env:DB_PASSWORD
 $dbSchema = $env:DB_SCHEMA
-if ([string]::IsNullOrWhiteSpace($dbSchema)) { $dbSchema = "ng" }
-if ($dbSchema -ne "ng") {
-  Write-Error "This initializer uses the fixed schema 'ng'. Set DB_SCHEMA=ng in .env.local."
+if ([string]::IsNullOrWhiteSpace($dbSchema)) { $dbSchema = "public" }
+if ($dbSchema.Trim().ToLower() -ne "public") {
+  Write-Error "Local DB initializer currently supports DB_SCHEMA=public (migrations reference public.*). Update DB_SCHEMA in .env.local."
   exit 1
 }
 
-$migration = Join-Path $PSScriptRoot "..\\database\\migrations\\001_init_ng_schema.sql"
-if (!(Test-Path $migration)) {
-  Write-Error "Missing migration file: $migration"
+$migrationsDir = Join-Path $PSScriptRoot "..\\database\\migrations"
+if (!(Test-Path $migrationsDir)) {
+  Write-Error "Missing migrations directory: $migrationsDir"
   exit 1
 }
+$migrations = Get-ChildItem -Path $migrationsDir -Filter "*.sql" | Sort-Object Name
+if ($migrations.Count -eq 0) {
+  Write-Error "No migration files found in: $migrationsDir"
+  exit 1
+}
+
+$seed = Join-Path $PSScriptRoot "..\\database\\seed\\001_food_items.sql"
 
 # We use psql ON_ERROR_STOP so failures are obvious.
 $env:PGPASSWORD = $dbPassword
@@ -43,9 +50,25 @@ $env:PGPASSWORD = $dbPassword
 Write-Host ""
 Write-Host "Initializing schema '$dbSchema' in database '$dbName' on $dbHost`:$dbPort ..."
 
-psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -c "CREATE SCHEMA IF NOT EXISTS $dbSchema;"
-psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -c "ALTER ROLE $dbUser IN DATABASE $dbName SET search_path TO $dbSchema,public;" 2>$null
-psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $migration
+foreach ($m in $migrations) {
+  Write-Host "Applying migration: $($m.Name)"
+  psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $m.FullName
+}
+
+if (Test-Path $seed) {
+  $countRaw = psql -t -A -h $dbHost -p $dbPort -U $dbUser -d $dbName -c "SELECT COUNT(*) FROM public.food_items;" 2>$null
+  $count = 0
+  [int]::TryParse(($countRaw | Select-Object -First 1), [ref]$count) | Out-Null
+
+  if ($count -gt 0) {
+    Write-Host "Seed data already present (food_items count=$count). Skipping seed."
+  } else {
+    Write-Host "Seeding food items..."
+    psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed
+  }
+} else {
+  Write-Host "Seed file not found (skipping): $seed"
+}
 
 Write-Host ""
 Write-Host "Local DB initialized."

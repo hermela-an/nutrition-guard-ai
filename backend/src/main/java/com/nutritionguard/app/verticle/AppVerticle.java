@@ -4,17 +4,25 @@ import com.nutritionguard.app.config.AppConfig;
 import com.nutritionguard.app.controller.AuthController;
 import com.nutritionguard.app.controller.CalculationController;
 import com.nutritionguard.app.controller.ChatController;
+import com.nutritionguard.app.controller.AdminFoodController;
+import com.nutritionguard.app.controller.AdminStatsController;
+import com.nutritionguard.app.controller.AdminUsersController;
+import com.nutritionguard.app.controller.AdminAnalyticsController;
 import com.nutritionguard.app.controller.FoodSearchController;
+import com.nutritionguard.app.controller.FoodsController;
 import com.nutritionguard.app.controller.MealPlanController;
 import com.nutritionguard.app.controller.NotificationController;
 import com.nutritionguard.app.controller.ProfileController;
 import com.nutritionguard.app.controller.ProgressController;
+import com.nutritionguard.app.routes.AdminMiddleware;
 import com.nutritionguard.app.db.Database;
 import com.nutritionguard.app.repository.FoodRepository;
 import com.nutritionguard.app.repository.MealTrackingRepository;
 import com.nutritionguard.app.repository.NotificationRepository;
 import com.nutritionguard.app.repository.ProfileRepository;
 import com.nutritionguard.app.repository.ProgressRepository;
+import com.nutritionguard.app.repository.UserRepository;
+import com.nutritionguard.app.repository.FoodSearchEventRepository;
 import com.nutritionguard.app.routes.AuthMiddleware;
 import com.nutritionguard.app.service.FoodSearchService;
 import com.nutritionguard.app.service.NotificationService;
@@ -50,21 +58,33 @@ public class AppVerticle extends AbstractVerticle {
     });
 
     router.route().handler(CorsHandler.create("*")
-      .allowedMethods(Set.of(io.vertx.core.http.HttpMethod.GET, io.vertx.core.http.HttpMethod.POST, io.vertx.core.http.HttpMethod.PUT))
+      .allowedMethods(Set.of(
+        io.vertx.core.http.HttpMethod.GET,
+        io.vertx.core.http.HttpMethod.POST,
+        io.vertx.core.http.HttpMethod.PUT,
+        io.vertx.core.http.HttpMethod.DELETE
+      ))
       .allowedHeader("Content-Type")
       .allowedHeader("Authorization"));
     router.route().handler(BodyHandler.create());
 
     ProfileService profileService = new ProfileService(new ProfileRepository(db));
-    FoodSearchService foodSearchService = new FoodSearchService(new FoodRepository(db));
+    FoodRepository foodRepository = new FoodRepository(db);
+    FoodSearchService foodSearchService = new FoodSearchService(foodRepository);
     ProgressService progressService = new ProgressService(new ProgressRepository(db));
     NotificationService notificationService = new NotificationService(new NotificationRepository(db));
     MealTrackingRepository mealTrackingRepository = new MealTrackingRepository(db);
+    UserRepository userRepository = new UserRepository(db);
+    FoodSearchEventRepository searchEvents = new FoodSearchEventRepository(db);
 
     new AuthController(vertx).mount(router);
     new CalculationController(vertx).mount(router);
 
-    AuthMiddleware auth = new AuthMiddleware(new JwtService(vertx, config));
+    AuthMiddleware auth = new AuthMiddleware(new JwtService(vertx, config), config.adminEmails());
+    AdminMiddleware admin = new AdminMiddleware();
+    router.route("/api/admin*").handler(auth::handle);
+    router.route("/api/admin*").handler(admin::handle);
+    router.route("/api/auth/me").handler(auth::handle);
     router.route("/api/profile*").handler(auth::handle);
     router.route("/api/meal-plan*").handler(auth::handle);
     router.route("/api/foods*").handler(auth::handle);
@@ -72,9 +92,22 @@ public class AppVerticle extends AbstractVerticle {
     router.route("/api/chat*").handler(auth::handle);
     router.route("/api/notifications*").handler(auth::handle);
 
+    router.get("/api/auth/me").handler(ctx -> ctx.response()
+      .putHeader("Content-Type", "application/json")
+      .end(new JsonObject()
+        .put("user_id", ctx.get("user_id"))
+        .put("email", ctx.get("email"))
+        .put("role", ctx.get("role"))
+        .encode()));
+
     new ProfileController(profileService, notificationService).mount(router);
     new MealPlanController(vertx, profileService, notificationService, mealTrackingRepository).mount(router);
-    new FoodSearchController(foodSearchService, profileService, notificationService).mount(router);
+    new FoodSearchController(foodSearchService, profileService, notificationService, searchEvents).mount(router);
+    new FoodsController(foodRepository, profileService).mount(router);
+    new AdminFoodController(foodRepository).mount(router);
+    new AdminUsersController(userRepository).mount(router);
+    new AdminStatsController(foodRepository, userRepository).mount(router);
+    new AdminAnalyticsController(searchEvents).mount(router);
     new ProgressController(progressService).mount(router);
     new ChatController(vertx, profileService, foodSearchService, notificationService).mount(router);
     new NotificationController(notificationService).mount(router);

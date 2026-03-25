@@ -196,6 +196,23 @@
       accent-color: var(--brand);
     }
 
+    .item-thumb {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e6ede3;
+      background: #f4f7f3;
+      flex: 0 0 auto;
+    }
+
+    .thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .item-content {
       display: flex;
       flex-direction: column;

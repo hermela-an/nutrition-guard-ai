@@ -52,7 +52,8 @@ export class LoginComponent {
       next: () => {
         this.error = false;
         this.status = 'Login successful. Redirecting...';
-        setTimeout(() => this.router.navigateByUrl('/dashboard'), 500);
+        const nextUrl = this.auth.isAdmin() ? '/admin' : '/dashboard';
+        setTimeout(() => this.router.navigateByUrl(nextUrl), 500);
       },
       error: (err) => {
         this.error = true;

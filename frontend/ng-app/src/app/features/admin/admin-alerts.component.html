@@ -1,0 +1,58 @@
+<div class="page-header">
+  <div>
+    <div class="eyebrow">Admin</div>
+    <h2>Alerts</h2>
+    <p class="muted">Quickly review foods flagged as Caution or Avoid.</p>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn ghost" (click)="setFilter('CAUTION')" [class.active]="filter === 'CAUTION'">Caution</button>
+    <button type="button" class="btn ghost" (click)="setFilter('AVOID')" [class.active]="filter === 'AVOID'">Avoid</button>
+  </div>
+</div>
+
+<div class="card error" *ngIf="error">{{ error }}</div>
+<div class="card" *ngIf="loading">Loading...</div>
+
+<div class="card" *ngIf="!loading">
+  <div class="search-row">
+    <input class="input" type="text" [(ngModel)]="query" placeholder="Search foods..." (keyup.enter)="refresh()" />
+    <button type="button" class="btn" (click)="refresh()">Search</button>
+  </div>
+
+  <div class="table-wrap" style="margin-top:12px;" *ngIf="foods.length > 0; else empty">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Food</th>
+          <th>Meal</th>
+          <th>Safety</th>
+          <th>Calories</th>
+          <th>Macros</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let f of foods">
+          <td class="row-title">
+            <div class="row-media">
+              <img *ngIf="f.image_url" class="thumb" [src]="f.image_url" alt="" />
+              <div class="thumb placeholder" *ngIf="!f.image_url">NG</div>
+              <div>
+                <strong>{{ f.food_name }}</strong>
+                <div class="muted small">{{ f.definition || '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ f.meal_type }}</td>
+          <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'GREEN' }}</span></td>
+          <td>{{ f.calories | number:'1.0-0' }}</td>
+          <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ng-template #empty>
+    <div class="empty muted">No alerts found for this filter.</div>
+  </ng-template>
+</div>
+

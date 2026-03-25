@@ -5,7 +5,7 @@ import { ApiService } from './api.service';
 import { TOKEN_KEY, USER_KEY } from '../config/app.constants';
 
 export interface AuthResponse {
-  user: { id: string; email: string };
+  user: { id: string; email: string; role?: 'USER' | 'ADMIN' | string };
   token: string;
 }
 
@@ -51,6 +51,20 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  userRole(): string {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return 'USER';
+    try {
+      return (JSON.parse(raw).role ?? 'USER').toString();
+    } catch {
+      return 'USER';
+    }
+  }
+
+  isAdmin(): boolean {
+    return this.userRole().trim().toUpperCase() === 'ADMIN';
   }
 
   private persist(res: AuthResponse): void {

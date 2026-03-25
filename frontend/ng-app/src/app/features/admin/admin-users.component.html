@@ -1,0 +1,115 @@
+<div class="page-header">
+  <div>
+    <div class="eyebrow">Admin</div>
+    <h2>User Management</h2>
+    <p class="muted">Search, filter, and manage roles and status.</p>
+  </div>
+</div>
+
+<div class="card error" *ngIf="error">{{ error }}</div>
+<div class="card" *ngIf="loading">Loading...</div>
+
+<div class="card" *ngIf="!loading">
+  <div class="toolbar">
+    <div class="search-row">
+      <input class="input" type="text" [(ngModel)]="query" placeholder="Search by email..." (keyup.enter)="refresh(true)" />
+      <button type="button" class="btn" (click)="refresh(true)">Search</button>
+    </div>
+
+    <div class="filters">
+      <select class="input" style="max-width:220px;" [(ngModel)]="status" (change)="refresh(true)">
+        <option value="ALL">All</option>
+        <option value="ACTIVE">Active</option>
+        <option value="INACTIVE">Inactive</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="table-wrap" style="margin-top:12px;" *ngIf="users.length > 0; else empty">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of users">
+          <td>
+            <div class="row-media">
+              <div class="avatar">{{ initials(u) }}</div>
+              <div>
+                <strong>{{ displayName(u) }}</strong>
+                <div class="muted small">ID: {{ u.id }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ u.email }}</td>
+          <td><span class="pill" [ngClass]="roleClass(u.role)">{{ u.role }}</span></td>
+          <td><span class="pill" [ngClass]="u.is_active ? 'safe' : 'avoid'">{{ statusLabel(u) }}</span></td>
+          <td class="muted small">{{ u.created_at | date:'mediumDate' }}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn ghost small" (click)="openEdit(u)">Edit</button>
+              <button type="button" class="btn danger small" (click)="deleteUser(u)">Delete</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ng-template #empty>
+    <div class="empty muted">No users found.</div>
+  </ng-template>
+
+  <div class="pagination" *ngIf="total > pageSize">
+    <button type="button" class="btn ghost small" (click)="go(page - 1)" [disabled]="page <= 1">Prev</button>
+    <button
+      type="button"
+      class="btn ghost small"
+      *ngFor="let p of pages()"
+      (click)="go(p)"
+      [class.active]="p === page"
+    >
+      {{ p }}
+    </button>
+    <button type="button" class="btn ghost small" (click)="go(page + 1)" [disabled]="page >= pageCount">Next</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" *ngIf="editing">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit user</h3>
+      <button type="button" class="btn ghost small" (click)="closeEdit()">Close</button>
+    </div>
+    <div class="muted small" style="margin-top:4px;">{{ editing.email }}</div>
+
+    <div class="form-grid" style="margin-top:12px;">
+      <label>
+        <span class="label">Role</span>
+        <select class="input" [(ngModel)]="editRole">
+          <option value="USER">USER</option>
+          <option value="ADMIN">ADMIN</option>
+        </select>
+      </label>
+      <label>
+        <span class="label">Status</span>
+        <select class="input" [(ngModel)]="editActive">
+          <option [ngValue]="true">Active</option>
+          <option [ngValue]="false">Inactive</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" (click)="closeEdit()">Cancel</button>
+      <button type="button" class="btn primary" (click)="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>

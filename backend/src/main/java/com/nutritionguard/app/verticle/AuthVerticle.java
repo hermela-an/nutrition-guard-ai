@@ -20,7 +20,7 @@ public class AuthVerticle extends AbstractVerticle {
 
   @Override
   public void start() {
-    AuthService service = new AuthService(new UserRepository(db), new JwtService(vertx, config));
+    AuthService service = new AuthService(new UserRepository(db), new JwtService(vertx, config), config.adminEmails());
 
     vertx.eventBus().consumer(EventAddresses.AUTH_REGISTER, msg -> {
       JsonObject body = (JsonObject) msg.body();

@@ -17,7 +17,8 @@ public record AppConfig(
   String dbSchema,
   String dbUser,
   String dbPassword,
-  String jwtSecret
+  String jwtSecret,
+  String adminEmails
 ) {
   private static final EnvFile ENV_FILE = EnvFile.loadFromWorkingDirectory();
 
@@ -31,7 +32,8 @@ public record AppConfig(
       strEnv("DB_SCHEMA", "public"),
       strEnv("DB_USER", "nutritionguard"),
       strEnv("DB_PASSWORD", "nutritionguard"),
-      strEnv("JWT_SECRET", "change-this-secret-for-prod")
+      strEnv("JWT_SECRET", "change-this-secret-for-prod"),
+      strEnv("ADMIN_EMAILS", strEnv("ADMIN_EMAIL", ""))
     );
   }
 

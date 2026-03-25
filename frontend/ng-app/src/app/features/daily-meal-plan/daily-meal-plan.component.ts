@@ -11,6 +11,7 @@ import { forkJoin } from 'rxjs';
 interface MealItem {
   id: number;
   food_name: string;
+  image_url?: string | null;
   portion?: string;
   portion_amount?: number | null;
   portion_unit?: string | null;
@@ -48,6 +49,8 @@ export class DailyMealPlanComponent {
   private readonly cdr = inject(ChangeDetectorRef);
 
   private readonly intakeStoragePrefix = 'ng:intake:daily:';
+  private readonly defaultFoodImageUrl =
+    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80';
 
   loading = true;
   error = '';
@@ -141,6 +144,7 @@ export class DailyMealPlanComponent {
     const normalized = items.map((item) => ({
       id: item.id,
       food_name: item.food_name,
+      image_url: item.image_url ?? null,
       portion: item.portion ?? this.formatPortion(item),
       calories: Number(item.calories ?? 0),
       traffic_light: item.traffic_light,
@@ -156,6 +160,19 @@ export class DailyMealPlanComponent {
       targetCalories,
       items: normalized
     };
+  }
+
+  imageFor(item: MealItem): string {
+    const raw = (item?.image_url ?? '').toString().trim();
+    return raw ? raw : this.defaultFoodImageUrl;
+  }
+
+  onFoodImageError(evt: Event): void {
+    const img = evt.target as HTMLImageElement | null;
+    if (!img) return;
+    if (img.dataset['fallbackApplied'] === '1') return;
+    img.dataset['fallbackApplied'] = '1';
+    img.src = this.defaultFoodImageUrl;
   }
 
   toggleEaten(item: MealItem & { meal_type?: string }): void {

@@ -6,6 +6,12 @@ public final class TrafficLightUtil {
   private TrafficLightUtil() {}
 
   public static String evaluate(JsonObject health, JsonObject food) {
+    String base = food == null ? null : food.getString("traffic_light");
+    String baseNormalized = base == null ? "" : base.trim().toUpperCase();
+    if ("RED".equals(baseNormalized)) {
+      return "RED";
+    }
+
     boolean diabetes = health.getBoolean("diabetes", false);
     boolean highBp = health.getBoolean("high_bp", false);
     boolean highCholesterol = health.getBoolean("high_cholesterol", false);
@@ -22,6 +28,11 @@ public final class TrafficLightUtil {
     if ((diabetes && sugar > 10) || ((highBp || heartDisease || kidneyDisease) && sodium > 350) || ((highCholesterol || heartDisease) && cholesterol > 30)) {
       return "YELLOW";
     }
+
+    if ("YELLOW".equals(baseNormalized)) {
+      return "YELLOW";
+    }
+
     return "GREEN";
   }
 }

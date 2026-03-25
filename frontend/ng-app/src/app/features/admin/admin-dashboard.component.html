@@ -1,0 +1,170 @@
+<div class="page-header">
+  <div>
+    <div class="eyebrow">Admin</div>
+    <h2>Food Management</h2>
+    <p class="muted">Search foods, review nutrition values, and manage safety labels.</p>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" routerLink="/dashboard">Open user app</a>
+    <button type="button" class="btn ghost" (click)="refresh(true)">Refresh</button>
+    <button type="button" class="btn primary" (click)="startCreate()">Add food</button>
+  </div>
+</div>
+
+<div class="card error" *ngIf="error">{{ error }}</div>
+<div class="card" *ngIf="loading">Loading...</div>
+
+<div class="card" *ngIf="!loading">
+  <div class="toolbar">
+    <div class="search-row">
+      <input class="input" type="text" [(ngModel)]="query" placeholder="Search foods..." (keyup.enter)="refresh(true)" />
+      <button type="button" class="btn" (click)="refresh(true)">Search</button>
+    </div>
+
+    <div class="filters">
+      <select class="input" style="max-width:200px;" [(ngModel)]="mealFilter" (change)="applyFilters(true)">
+        <option value="ALL">All meals</option>
+        <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
+      </select>
+      <select class="input" style="max-width:200px;" [(ngModel)]="lightFilter" (change)="applyFilters(true)">
+        <option value="ALL">All safety</option>
+        <option value="GREEN">Safe</option>
+        <option value="YELLOW">Caution</option>
+        <option value="RED">Avoid</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-top:12px;" *ngIf="!loading">
+  <div class="card">
+    <div class="card-head">
+      <h3>{{ editing ? 'Edit food' : 'Add food' }}</h3>
+      <button type="button" class="btn ghost small" *ngIf="editing" (click)="cancelEdit()">Cancel</button>
+    </div>
+
+    <div class="form-grid" style="margin-top:12px;">
+      <label>
+        <span class="label">Food name *</span>
+        <input class="input" type="text" [(ngModel)]="form.food_name" />
+      </label>
+      <label>
+        <span class="label">Meal type *</span>
+        <select class="input" [(ngModel)]="form.meal_type">
+          <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
+        </select>
+      </label>
+
+      <label>
+        <span class="label">Safety label</span>
+        <select class="input" [(ngModel)]="form.traffic_light">
+          <option *ngFor="let t of trafficLights" [value]="t">{{ t }}</option>
+        </select>
+      </label>
+      <label>
+        <span class="label">Image URL</span>
+        <input class="input" type="text" [(ngModel)]="form.image_url" placeholder="https://..." />
+      </label>
+
+      <label>
+        <span class="label">Calories</span>
+        <input class="input" type="number" [(ngModel)]="form.calories" />
+      </label>
+      <label>
+        <span class="label">Portion</span>
+        <div class="grid-2" style="gap:10px;">
+          <input class="input" type="number" [(ngModel)]="form.portion_amount" />
+          <input class="input" type="text" [(ngModel)]="form.portion_unit" />
+        </div>
+      </label>
+
+      <label>
+        <span class="label">Protein (g)</span>
+        <input class="input" type="number" [(ngModel)]="form.protein_g" />
+      </label>
+      <label>
+        <span class="label">Carbs (g)</span>
+        <input class="input" type="number" [(ngModel)]="form.carbs_g" />
+      </label>
+      <label>
+        <span class="label">Fat (g)</span>
+        <input class="input" type="number" [(ngModel)]="form.fat_g" />
+      </label>
+      <label>
+        <span class="label">Sodium (mg)</span>
+        <input class="input" type="number" [(ngModel)]="form.sodium_mg" />
+      </label>
+
+      <label style="grid-column: 1 / -1;">
+        <span class="label">Definition</span>
+        <textarea class="input" rows="3" [(ngModel)]="form.definition"></textarea>
+      </label>
+      <label style="grid-column: 1 / -1;">
+        <span class="label">Description</span>
+        <textarea class="input" rows="3" [(ngModel)]="form.description"></textarea>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn primary" (click)="save()">{{ editing ? 'Save changes' : 'Create food' }}</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Foods ({{ filteredFoods.length }})</h3>
+      <span class="muted">Image + macros + safety label</span>
+    </div>
+
+    <div class="table-wrap" style="margin-top:12px;" *ngIf="pagedFoods.length > 0; else empty">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Food</th>
+            <th>Meal</th>
+            <th>Safety</th>
+            <th>Calories</th>
+            <th>Macros</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let f of pagedFoods; trackBy: trackById">
+            <td class="muted small">{{ f.id }}</td>
+            <td>
+              <div class="row-media">
+                <img *ngIf="f.image_url" class="thumb" [src]="f.image_url" alt="" />
+                <div class="thumb placeholder" *ngIf="!f.image_url">NG</div>
+                <div>
+                  <strong>{{ f.food_name }}</strong>
+                  <div class="muted small">{{ f.definition || '—' }}</div>
+                </div>
+              </div>
+            </td>
+            <td>{{ f.meal_type }}</td>
+            <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'GREEN' }}</span></td>
+            <td>{{ f.calories | number:'1.0-0' }}</td>
+            <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
+            <td>
+              <div class="row-actions">
+                <button type="button" class="btn ghost small" (click)="startEdit(f)">Edit</button>
+                <button type="button" class="btn danger small" (click)="delete(f)">Delete</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #empty>
+      <div class="empty muted">No foods found.</div>
+    </ng-template>
+
+    <div class="pagination" *ngIf="filteredFoods.length > pageSize">
+      <button type="button" class="btn ghost small" (click)="setPage(page - 1)" [disabled]="page <= 1">Prev</button>
+      <span class="muted small">Page {{ page }} / {{ pageCount }}</span>
+      <button type="button" class="btn ghost small" (click)="setPage(page + 1)" [disabled]="page >= pageCount">Next</button>
+    </div>
+  </div>
+</div>

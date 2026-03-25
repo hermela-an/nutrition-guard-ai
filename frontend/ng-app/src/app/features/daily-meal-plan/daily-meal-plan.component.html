@@ -67,6 +67,15 @@
           <li *ngFor="let item of meal.items">
             <label class="eaten-row">
               <input type="checkbox" [checked]="!!item.eaten" (change)="toggleEaten(item)">
+              <div class="item-thumb">
+                <img
+                  class="thumb-img"
+                  [src]="imageFor(item)"
+                  (error)="onFoodImageError($event)"
+                  [alt]="item.food_name + ' image'"
+                  loading="lazy"
+                />
+              </div>
               <div class="item-content">
                 <div class="item-name">{{ item.food_name }}</div>
                 <div class="item-meta">

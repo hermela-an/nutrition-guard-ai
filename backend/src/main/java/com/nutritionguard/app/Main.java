@@ -16,14 +16,15 @@ public class Main {
     Database database = new Database(vertx, config);
 
     System.out.printf(
-      "Config: APP_PORT=%d DB_HOST=%s DB_PORT=%d DB_NAME=%s DB_SCHEMA=%s DB_USER=%s ENV_FILE=%s%n",
+      "Config: APP_PORT=%d DB_HOST=%s DB_PORT=%d DB_NAME=%s DB_SCHEMA=%s DB_USER=%s ENV_FILE=%s ADMIN_EMAILS=%s%n",
       config.httpPort(),
       config.dbHost(),
       config.dbPort(),
       config.dbName(),
       config.dbSchema(),
       config.dbUser(),
-      AppConfig.loadedEnvFile()
+      AppConfig.loadedEnvFile(),
+      config.adminEmails() == null || config.adminEmails().isBlank() ? "(none)" : "(configured)"
     );
 
     database.ping()

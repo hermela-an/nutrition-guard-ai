@@ -6,6 +6,8 @@ import { FloatingChatComponent } from './floating-chat.component';
 import { NotificationsService } from '../../core/services/notifications.service';
 import { Subscription, timer } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+import { ToastContainerComponent } from './toast-container.component';
+import { ConfirmDialogHostComponent } from './confirm-dialog-host.component';
 
 interface MenuItem {
   label: string;
@@ -15,7 +17,7 @@ interface MenuItem {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, FloatingChatComponent],
+  imports: [CommonModule, RouterLink, RouterLinkActive, FloatingChatComponent, ToastContainerComponent, ConfirmDialogHostComponent],
   template: `
     <div class="app-shell">
       <aside class="sidebar">
@@ -36,6 +38,10 @@ interface MenuItem {
 
       <!-- Global AI Chat Assistant -->
       <app-floating-chat></app-floating-chat>
+
+      <!-- Global UI overlays -->
+      <app-toast-container></app-toast-container>
+      <app-confirm-dialog-host></app-confirm-dialog-host>
     </div>
   `,
   styles: [`

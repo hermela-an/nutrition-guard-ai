@@ -17,4 +17,8 @@ export class ApiService {
   put<T>(path: string, body: unknown, headers?: HttpHeaders) {
     return this.http.put<T>(`${API_BASE_URL}${path}`, body, { headers });
   }
+
+  delete<T>(path: string, headers?: HttpHeaders) {
+    return this.http.delete<T>(`${API_BASE_URL}${path}`, { headers });
+  }
 }
