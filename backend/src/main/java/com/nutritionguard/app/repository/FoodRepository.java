@@ -180,14 +180,16 @@ public class FoodRepository {
 
   public Future<JsonObject> create(JsonObject input) {
     JsonObject safe = input == null ? new JsonObject() : input;
+    double portionValue = doubleFrom(safe, "portion_value", doubleFrom(safe, "portion_amount", 1.0));
+    int caloriesKcal = intFrom(safe, "calories_kcal", intFrom(safe, "calories", 0));
 
     String sql = """
       INSERT INTO food_items (
         food_name,
         meal_type,
-        portion_amount,
+        portion_value,
         portion_unit,
-        calories,
+        calories_kcal,
         protein_g,
         carbs_g,
         fat_g,
@@ -201,16 +203,32 @@ public class FoodRepository {
         traffic_light
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16)
-      RETURNING *
+      RETURNING
+        id,
+        traffic_light,
+        food_name,
+        definition,
+        image_url,
+        meal_type,
+        (portion_value)::double precision AS portion_amount,
+        portion_unit,
+        (calories_kcal)::numeric::int AS calories,
+        (protein_g)::double precision AS protein_g,
+        (carbs_g)::double precision AS carbs_g,
+        (fat_g)::double precision AS fat_g,
+        (sugar_g)::double precision AS sugar_g,
+        (sodium_mg)::double precision AS sodium_mg,
+        (cholesterol_mg)::double precision AS cholesterol_mg,
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins
       """;
 
     return db
       .query(sql, Tuple.of(
         safe.getString("food_name", ""),
         safe.getString("meal_type", ""),
-        safe.getDouble("portion_amount", 1.0),
+        portionValue,
         safe.getString("portion_unit", "serving"),
-        safe.getInteger("calories", 0),
+        caloriesKcal,
         safe.getDouble("protein_g", 0.0),
         safe.getDouble("carbs_g", 0.0),
         safe.getDouble("fat_g", 0.0),
@@ -229,14 +247,28 @@ public class FoodRepository {
   public Future<JsonObject> update(int id, JsonObject input) {
     JsonObject safe = input == null ? new JsonObject() : input;
 
+    Double portionValue = null;
+    if (safe.containsKey("portion_value")) {
+      portionValue = doubleOrNull(safe.getValue("portion_value"));
+    } else if (safe.containsKey("portion_amount")) {
+      portionValue = doubleOrNull(safe.getValue("portion_amount"));
+    }
+
+    Integer caloriesKcal = null;
+    if (safe.containsKey("calories_kcal")) {
+      caloriesKcal = intOrNull(safe.getValue("calories_kcal"));
+    } else if (safe.containsKey("calories")) {
+      caloriesKcal = intOrNull(safe.getValue("calories"));
+    }
+
     String sql = """
       UPDATE food_items
       SET
         food_name = COALESCE($2, food_name),
         meal_type = COALESCE($3, meal_type),
-        portion_amount = COALESCE($4, portion_amount),
+        portion_value = COALESCE($4, portion_value),
         portion_unit = COALESCE($5, portion_unit),
-        calories = COALESCE($6, calories),
+        calories_kcal = COALESCE($6, calories_kcal),
         protein_g = COALESCE($7, protein_g),
         carbs_g = COALESCE($8, carbs_g),
         fat_g = COALESCE($9, fat_g),
@@ -249,7 +281,23 @@ public class FoodRepository {
         description = COALESCE($16, description),
         traffic_light = COALESCE($17, traffic_light)
       WHERE id = $1
-      RETURNING *
+      RETURNING
+        id,
+        traffic_light,
+        food_name,
+        definition,
+        image_url,
+        meal_type,
+        (portion_value)::double precision AS portion_amount,
+        portion_unit,
+        (calories_kcal)::numeric::int AS calories,
+        (protein_g)::double precision AS protein_g,
+        (carbs_g)::double precision AS carbs_g,
+        (fat_g)::double precision AS fat_g,
+        (sugar_g)::double precision AS sugar_g,
+        (sodium_mg)::double precision AS sodium_mg,
+        (cholesterol_mg)::double precision AS cholesterol_mg,
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins
       """;
 
     return db
@@ -257,9 +305,9 @@ public class FoodRepository {
         id,
         safe.containsKey("food_name") ? safe.getString("food_name") : null,
         safe.containsKey("meal_type") ? safe.getString("meal_type") : null,
-        safe.containsKey("portion_amount") ? safe.getDouble("portion_amount") : null,
+        portionValue,
         safe.containsKey("portion_unit") ? safe.getString("portion_unit") : null,
-        safe.containsKey("calories") ? safe.getInteger("calories") : null,
+        caloriesKcal,
         safe.containsKey("protein_g") ? safe.getDouble("protein_g") : null,
         safe.containsKey("carbs_g") ? safe.getDouble("carbs_g") : null,
         safe.containsKey("fat_g") ? safe.getDouble("fat_g") : null,
@@ -278,6 +326,42 @@ public class FoodRepository {
         }
         return toFood(rows.iterator().next());
       });
+  }
+
+  private double doubleFrom(JsonObject obj, String key, double fallback) {
+    Double v = doubleOrNull(obj.getValue(key));
+    return v == null ? fallback : v;
+  }
+
+  private int intFrom(JsonObject obj, String key, int fallback) {
+    Integer v = intOrNull(obj.getValue(key));
+    return v == null ? fallback : v;
+  }
+
+  private Double doubleOrNull(Object raw) {
+    if (raw == null) return null;
+    if (raw instanceof Number n) return n.doubleValue();
+    if (raw instanceof String s && !s.isBlank()) {
+      try {
+        return Double.parseDouble(s.trim());
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private Integer intOrNull(Object raw) {
+    if (raw == null) return null;
+    if (raw instanceof Number n) return n.intValue();
+    if (raw instanceof String s && !s.isBlank()) {
+      try {
+        return Integer.parseInt(s.trim());
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
   }
 
   public Future<Integer> delete(int id) {

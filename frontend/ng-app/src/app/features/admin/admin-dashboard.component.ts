@@ -29,6 +29,7 @@ export class AdminDashboardComponent {
   foods: AdminFoodItem[] = [];
   filteredFoods: AdminFoodItem[] = [];
   pagedFoods: AdminFoodItem[] = [];
+  imageName = '';
 
   mealFilter: 'ALL' | string = 'ALL';
   lightFilter: FilterAll = 'ALL';
@@ -94,6 +95,7 @@ export class AdminDashboardComponent {
   startCreate(): void {
     this.editing = null;
     this.form = this.emptyForm();
+    this.imageName = '';
   }
 
   startEdit(item: AdminFoodItem): void {
@@ -116,11 +118,53 @@ export class AdminDashboardComponent {
       description: item.description ?? '',
       traffic_light: (item.traffic_light ?? 'GREEN') as string
     };
+    this.imageName = item.image_url ? 'Current image' : '';
   }
 
   cancelEdit(): void {
     this.editing = null;
     this.form = this.emptyForm();
+    this.imageName = '';
+  }
+
+  onImageSelected(event: Event, input?: HTMLInputElement): void {
+    const el = (input ?? (event.target as HTMLInputElement)) as HTMLInputElement;
+    const file = el.files && el.files.length > 0 ? el.files[0] : null;
+    if (!file) return;
+
+    const maxBytes = 1_500_000; // ~1.5MB to keep payload reasonable
+    if (file.size > maxBytes) {
+      this.toast.error('Image too large. Please choose an image under ~1.5MB.');
+      el.value = '';
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Please choose a valid image file.');
+      el.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        this.form.image_url = result;
+        this.imageName = file.name;
+        this.toast.success('Image attached');
+        this.cdr.detectChanges();
+      }
+    };
+    reader.onerror = () => {
+      this.toast.error('Failed to read image file.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearImage(input: HTMLInputElement): void {
+    input.value = '';
+    this.form.image_url = '';
+    this.imageName = '';
   }
 
   save(): void {
@@ -230,12 +274,19 @@ export class AdminDashboardComponent {
       return Number.isFinite(n) ? n : 0;
     };
 
+    const portionAmount = Math.max(0, num(form.portion_amount));
+    const calories = Math.max(0, Math.round(num(form.calories)));
+
     return {
       food_name: text(form.food_name),
       meal_type: text(form.meal_type).toLowerCase(),
-      portion_amount: num(form.portion_amount),
+      portion_amount: portionAmount,
+      // Back-compat with DB column naming in this repo.
+      // Backend will prefer portion_value / calories_kcal when present.
+      ...(portionAmount !== null ? ({ portion_value: portionAmount } as any) : {}),
       portion_unit: text(form.portion_unit),
-      calories: Math.max(0, Math.round(num(form.calories))),
+      calories,
+      ...(calories !== null ? ({ calories_kcal: calories } as any) : {}),
       protein_g: Math.max(0, num(form.protein_g)),
       carbs_g: Math.max(0, num(form.carbs_g)),
       fat_g: Math.max(0, num(form.fat_g)),

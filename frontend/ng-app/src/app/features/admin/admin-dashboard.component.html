@@ -62,8 +62,20 @@
         </select>
       </label>
       <label>
-        <span class="label">Image URL</span>
-        <input class="input" type="text" [(ngModel)]="form.image_url" placeholder="https://..." />
+        <span class="label">Food image</span>
+        <input id="foodImageFile" #imageFile class="file-input" type="file" accept="image/*" (change)="onImageSelected($event, imageFile)" />
+        <div class="file-row" style="margin-top:6px;">
+          <label class="btn ghost small" for="foodImageFile">Choose image</label>
+          <span class="muted small file-name">{{ imageName || 'No file selected' }}</span>
+          <button type="button" class="btn ghost small" *ngIf="imageName" (click)="clearImage(imageFile)">Remove</button>
+        </div>
+        <div class="row-media" style="margin-top:10px;" *ngIf="form.image_url">
+          <img class="thumb" [src]="form.image_url" alt="" />
+          <span class="muted small">Preview</span>
+        </div>
+        <div class="muted small" style="margin-top:8px;">
+          Tip: images are saved as a data URL (no external link needed).
+        </div>
       </label>
 
       <label>
