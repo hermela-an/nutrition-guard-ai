@@ -8,6 +8,9 @@ import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.Tuple;
 
+import java.util.List;
+import java.util.Map;
+
 public class FoodRepository {
   private final Database db;
 
@@ -15,19 +18,42 @@ public class FoodRepository {
     this.db = db;
   }
 
+  private String normalizeCategory(String raw) {
+    if (raw == null) return "Vegetables";
+    String trimmed = raw.trim();
+    if (trimmed.isEmpty()) return "Vegetables";
+
+    return switch (trimmed.toLowerCase()) {
+      case "protein" -> "Protein";
+      case "fruits", "fruit" -> "Fruits";
+      case "vegetables", "vegetable", "veggies", "veggie" -> "Vegetables";
+      case "dairy" -> "Dairy";
+      case "grains", "grain" -> "Grains";
+      default -> "Vegetables";
+    };
+  }
+
   public Future<JsonArray> search(String query) {
     String sql = """
       WITH normalized AS (
         SELECT
           id,
-          to_jsonb(food_items)->>'traffic_light' AS traffic_light,
+          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
+            WHEN 'GREEN' THEN 'SAFE'
+            WHEN 'YELLOW' THEN 'CAUTION'
+            WHEN 'RED' THEN 'AVOID'
+            WHEN 'SAFE' THEN 'SAFE'
+            WHEN 'CAUTION' THEN 'CAUTION'
+            WHEN 'AVOID' THEN 'AVOID'
+            ELSE 'SAFE'
+          END AS traffic_light,
           COALESCE(
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          to_jsonb(food_items)->>'category' AS category,
           COALESCE(
             to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'description',
             to_jsonb(food_items)->>'short_description'
           ) AS definition,
           COALESCE(
@@ -52,7 +78,8 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins
+          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
       SELECT *
@@ -74,14 +101,22 @@ public class FoodRepository {
       WITH normalized AS (
         SELECT
           id,
-          to_jsonb(food_items)->>'traffic_light' AS traffic_light,
+          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
+            WHEN 'GREEN' THEN 'SAFE'
+            WHEN 'YELLOW' THEN 'CAUTION'
+            WHEN 'RED' THEN 'AVOID'
+            WHEN 'SAFE' THEN 'SAFE'
+            WHEN 'CAUTION' THEN 'CAUTION'
+            WHEN 'AVOID' THEN 'AVOID'
+            ELSE 'SAFE'
+          END AS traffic_light,
           COALESCE(
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          to_jsonb(food_items)->>'category' AS category,
           COALESCE(
             to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'description',
             to_jsonb(food_items)->>'short_description'
           ) AS definition,
           COALESCE(
@@ -106,7 +141,8 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins
+          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
       SELECT *
@@ -131,14 +167,22 @@ public class FoodRepository {
       WITH normalized AS (
         SELECT
           id,
-          to_jsonb(food_items)->>'traffic_light' AS traffic_light,
+          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
+            WHEN 'GREEN' THEN 'SAFE'
+            WHEN 'YELLOW' THEN 'CAUTION'
+            WHEN 'RED' THEN 'AVOID'
+            WHEN 'SAFE' THEN 'SAFE'
+            WHEN 'CAUTION' THEN 'CAUTION'
+            WHEN 'AVOID' THEN 'AVOID'
+            ELSE 'SAFE'
+          END AS traffic_light,
           COALESCE(
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          to_jsonb(food_items)->>'category' AS category,
           COALESCE(
             to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'description',
             to_jsonb(food_items)->>'short_description'
           ) AS definition,
           COALESCE(
@@ -163,7 +207,8 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins
+          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
       SELECT *
@@ -186,10 +231,11 @@ public class FoodRepository {
     String sql = """
       INSERT INTO food_items (
         food_name,
+        category,
         meal_type,
-        portion_value,
+        portion_amount,
         portion_unit,
-        calories_kcal,
+        calories,
         protein_g,
         carbs_g,
         fat_g,
@@ -197,49 +243,52 @@ public class FoodRepository {
         sodium_mg,
         cholesterol_mg,
         vitamins,
+        health_effect,
         image_url,
         definition,
-        description,
         traffic_light
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17)
       RETURNING
         id,
         traffic_light,
         food_name,
+        category,
         definition,
         image_url,
         meal_type,
-        (portion_value)::double precision AS portion_amount,
+        (portion_amount)::double precision AS portion_amount,
         portion_unit,
-        (calories_kcal)::numeric::int AS calories,
+        (calories)::numeric::int AS calories,
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
         (sugar_g)::double precision AS sugar_g,
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
-        COALESCE(vitamins, '{}'::jsonb) AS vitamins
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        COALESCE(health_effect, '{}'::jsonb) AS health_effect
       """;
 
     return db
       .query(sql, Tuple.of(
         safe.getString("food_name", ""),
+        normalizeCategory(safe.getString("category")),
         safe.getString("meal_type", ""),
         portionValue,
         safe.getString("portion_unit", "serving"),
         caloriesKcal,
-        safe.getDouble("protein_g", 0.0),
-        safe.getDouble("carbs_g", 0.0),
-        safe.getDouble("fat_g", 0.0),
-        safe.getDouble("sugar_g", 0.0),
-        safe.getDouble("sodium_mg", 0.0),
-        safe.getDouble("cholesterol_mg", 0.0),
-        (safe.getJsonObject("vitamins", new JsonObject())).encode(),
+        doubleFrom(safe, "protein_g", 0.0),
+        doubleFrom(safe, "carbs_g", 0.0),
+        doubleFrom(safe, "fat_g", 0.0),
+        doubleFrom(safe, "sugar_g", 0.0),
+        doubleFrom(safe, "sodium_mg", 0.0),
+        doubleFrom(safe, "cholesterol_mg", 0.0),
+        encodeJsonOrDefault(safe, "vitamins", "{}"),
+        encodeJsonOrDefault(safe, "health_effect", "{}"),
         safe.getString("image_url"),
         safe.getString("definition"),
-        safe.getString("description"),
-        normalizeLight(safe.getString("traffic_light", "GREEN"))
+        normalizeLight(safe.getString("traffic_light", "SAFE"))
       ))
       .map(rows -> toFood(rows.iterator().next()));
   }
@@ -265,59 +314,63 @@ public class FoodRepository {
       UPDATE food_items
       SET
         food_name = COALESCE($2, food_name),
-        meal_type = COALESCE($3, meal_type),
-        portion_value = COALESCE($4, portion_value),
-        portion_unit = COALESCE($5, portion_unit),
-        calories_kcal = COALESCE($6, calories_kcal),
-        protein_g = COALESCE($7, protein_g),
-        carbs_g = COALESCE($8, carbs_g),
-        fat_g = COALESCE($9, fat_g),
-        sugar_g = COALESCE($10, sugar_g),
-        sodium_mg = COALESCE($11, sodium_mg),
-        cholesterol_mg = COALESCE($12, cholesterol_mg),
-        vitamins = COALESCE($13::jsonb, vitamins),
-        image_url = COALESCE($14, image_url),
-        definition = COALESCE($15, definition),
-        description = COALESCE($16, description),
-        traffic_light = COALESCE($17, traffic_light)
+        category = COALESCE($3, category),
+        meal_type = COALESCE($4, meal_type),
+        portion_amount = COALESCE($5, portion_amount),
+        portion_unit = COALESCE($6, portion_unit),
+        calories = COALESCE($7, calories),
+        protein_g = COALESCE($8, protein_g),
+        carbs_g = COALESCE($9, carbs_g),
+        fat_g = COALESCE($10, fat_g),
+        sugar_g = COALESCE($11, sugar_g),
+        sodium_mg = COALESCE($12, sodium_mg),
+        cholesterol_mg = COALESCE($13, cholesterol_mg),
+        vitamins = COALESCE($14::jsonb, vitamins),
+        health_effect = COALESCE($15::jsonb, health_effect),
+        image_url = COALESCE($16, image_url),
+        definition = COALESCE($17, definition),
+        traffic_light = COALESCE($18, traffic_light)
       WHERE id = $1
       RETURNING
         id,
         traffic_light,
         food_name,
+        category,
         definition,
         image_url,
         meal_type,
-        (portion_value)::double precision AS portion_amount,
+        (portion_amount)::double precision AS portion_amount,
         portion_unit,
-        (calories_kcal)::numeric::int AS calories,
+        (calories)::numeric::int AS calories,
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
         (sugar_g)::double precision AS sugar_g,
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
-        COALESCE(vitamins, '{}'::jsonb) AS vitamins
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        COALESCE(health_effect, '{}'::jsonb) AS health_effect
       """;
 
     return db
       .query(sql, Tuple.of(
         id,
         safe.containsKey("food_name") ? safe.getString("food_name") : null,
+        safe.containsKey("category") ? normalizeCategory(safe.getString("category")) : null,
         safe.containsKey("meal_type") ? safe.getString("meal_type") : null,
         portionValue,
         safe.containsKey("portion_unit") ? safe.getString("portion_unit") : null,
         caloriesKcal,
-        safe.containsKey("protein_g") ? safe.getDouble("protein_g") : null,
-        safe.containsKey("carbs_g") ? safe.getDouble("carbs_g") : null,
-        safe.containsKey("fat_g") ? safe.getDouble("fat_g") : null,
-        safe.containsKey("sugar_g") ? safe.getDouble("sugar_g") : null,
-        safe.containsKey("sodium_mg") ? safe.getDouble("sodium_mg") : null,
-        safe.containsKey("cholesterol_mg") ? safe.getDouble("cholesterol_mg") : null,
-        safe.containsKey("vitamins") ? safe.getJsonObject("vitamins").encode() : null,
+        safe.containsKey("protein_g") ? doubleOrNull(safe.getValue("protein_g")) : null,
+        safe.containsKey("carbs_g") ? doubleOrNull(safe.getValue("carbs_g")) : null,
+        safe.containsKey("fat_g") ? doubleOrNull(safe.getValue("fat_g")) : null,
+        safe.containsKey("sugar_g") ? doubleOrNull(safe.getValue("sugar_g")) : null,
+        safe.containsKey("sodium_mg") ? doubleOrNull(safe.getValue("sodium_mg")) : null,
+        safe.containsKey("cholesterol_mg") ? doubleOrNull(safe.getValue("cholesterol_mg")) : null,
+        encodeJsonOrNull(safe, "vitamins"),
+        encodeJsonOrNull(safe, "health_effect"),
         safe.containsKey("image_url") ? safe.getString("image_url") : null,
         safe.containsKey("definition") ? safe.getString("definition") : null,
-        safe.containsKey("description") ? safe.getString("description") : null,
         safe.containsKey("traffic_light") ? normalizeLight(safe.getString("traffic_light")) : null
       ))
       .map(rows -> {
@@ -326,6 +379,41 @@ public class FoodRepository {
         }
         return toFood(rows.iterator().next());
       });
+  }
+
+  private String encodeJsonOrDefault(JsonObject obj, String key, String defaultJson) {
+    String encoded = encodeJsonOrNull(obj, key);
+    return encoded == null ? defaultJson : encoded;
+  }
+
+  private String encodeJsonOrNull(JsonObject obj, String key) {
+    if (obj == null || key == null || key.isBlank() || !obj.containsKey(key)) return null;
+    Object v = obj.getValue(key);
+    if (v == null) return null;
+
+    if (v instanceof JsonObject jo) return jo.encode();
+    if (v instanceof JsonArray ja) return ja.encode();
+
+    if (v instanceof Map<?, ?> m) {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> cast = (Map<String, Object>) m;
+      return new JsonObject(cast).encode();
+    }
+    if (v instanceof List<?> l) {
+      @SuppressWarnings("unchecked")
+      List<Object> cast = (List<Object>) l;
+      return new JsonArray(cast).encode();
+    }
+
+    if (v instanceof String s) {
+      String trimmed = s.trim();
+      if (trimmed.isEmpty()) return null;
+      // If the client already sent a JSON string, pass it through when it looks valid-ish.
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+      return null;
+    }
+
+    return null;
   }
 
   private double doubleFrom(JsonObject obj, String key, double fallback) {
@@ -388,14 +476,22 @@ public class FoodRepository {
       WITH normalized AS (
         SELECT
           id,
-          to_jsonb(food_items)->>'traffic_light' AS traffic_light,
+          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
+            WHEN 'GREEN' THEN 'SAFE'
+            WHEN 'YELLOW' THEN 'CAUTION'
+            WHEN 'RED' THEN 'AVOID'
+            WHEN 'SAFE' THEN 'SAFE'
+            WHEN 'CAUTION' THEN 'CAUTION'
+            WHEN 'AVOID' THEN 'AVOID'
+            ELSE 'SAFE'
+          END AS traffic_light,
           COALESCE(
             to_jsonb(food_items)->>'food_name',
             to_jsonb(food_items)->>'name'
           ) AS food_name,
+          to_jsonb(food_items)->>'category' AS category,
           COALESCE(
             to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'description',
             to_jsonb(food_items)->>'short_description'
           ) AS definition,
           COALESCE(
@@ -420,7 +516,8 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins
+          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
       SELECT *
@@ -492,6 +589,7 @@ public class FoodRepository {
       .put("id", row.getInteger("id"))
       .put("traffic_light", row.getString("traffic_light"))
       .put("food_name", row.getString("food_name"))
+      .put("category", row.getString("category"))
       .put("definition", row.getString("definition"))
       .put("image_url", row.getString("image_url"))
       .put("meal_type", row.getString("meal_type"))
@@ -504,16 +602,16 @@ public class FoodRepository {
       .put("sugar_g", row.getDouble("sugar_g"))
       .put("sodium_mg", row.getDouble("sodium_mg"))
       .put("cholesterol_mg", row.getDouble("cholesterol_mg"))
-      .put("vitamins", row.getJsonObject("vitamins"));
+      .put("vitamins", row.getJsonObject("vitamins"))
+      .put("health_effect", row.getJsonObject("health_effect"));
   }
 
   private String normalizeLight(String raw) {
-    if (raw == null) return "GREEN";
+    if (raw == null) return "SAFE";
     String normalized = raw.trim().toUpperCase();
-    if ("SAFE".equals(normalized)) return "GREEN";
-    if ("CAUTION".equals(normalized) || "WARN".equals(normalized) || "WARNING".equals(normalized)) return "YELLOW";
-    if ("AVOID".equals(normalized) || "DANGER".equals(normalized)) return "RED";
-    if ("GREEN".equals(normalized) || "YELLOW".equals(normalized) || "RED".equals(normalized)) return normalized;
-    return "GREEN";
+    if ("SAFE".equals(normalized) || "GREEN".equals(normalized) || "OK".equals(normalized)) return "SAFE";
+    if ("CAUTION".equals(normalized) || "YELLOW".equals(normalized) || "WARN".equals(normalized) || "WARNING".equals(normalized)) return "CAUTION";
+    if ("AVOID".equals(normalized) || "RED".equals(normalized) || "DANGER".equals(normalized)) return "AVOID";
+    return "SAFE";
   }
 }

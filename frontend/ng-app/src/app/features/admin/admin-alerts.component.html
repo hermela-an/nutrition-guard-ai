@@ -25,7 +25,7 @@
         <tr>
           <th>Food</th>
           <th>Meal</th>
-          <th>Safety</th>
+          <th>Traffic light</th>
           <th>Calories</th>
           <th>Macros</th>
         </tr>
@@ -43,7 +43,7 @@
             </div>
           </td>
           <td>{{ f.meal_type }}</td>
-          <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'GREEN' }}</span></td>
+          <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
           <td>{{ f.calories | number:'1.0-0' }}</td>
           <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
         </tr>
@@ -55,4 +55,3 @@
     <div class="empty muted">No alerts found for this filter.</div>
   </ng-template>
 </div>
-

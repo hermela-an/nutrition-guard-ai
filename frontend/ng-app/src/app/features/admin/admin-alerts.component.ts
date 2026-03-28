@@ -42,7 +42,7 @@ export class AdminAlertsComponent {
       .subscribe({
         next: (items) => {
           const list = items ?? [];
-          const wanted = this.filter === 'AVOID' ? 'RED' : 'YELLOW';
+          const wanted = this.filter === 'AVOID' ? 'AVOID' : 'CAUTION';
           this.foods = list.filter((f) => (f.traffic_light ?? '').toString().toUpperCase() === wanted);
         },
         error: (err) => (this.error = this.errorFrom(err, 'Failed to load alerts.'))
@@ -56,8 +56,8 @@ export class AdminAlertsComponent {
 
   lightClass(light: string | null | undefined): 'safe' | 'caution' | 'avoid' {
     const normalized = (light ?? '').toString().toUpperCase();
-    if (normalized === 'RED') return 'avoid';
-    if (normalized === 'YELLOW') return 'caution';
+    if (normalized === 'AVOID' || normalized === 'RED') return 'avoid';
+    if (normalized === 'CAUTION' || normalized === 'YELLOW') return 'caution';
     return 'safe';
   }
 

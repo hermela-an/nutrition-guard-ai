@@ -20,10 +20,9 @@ BEGIN
 END
 $$;
 
--- Foods: add optional description + base traffic light
+-- Foods: add base traffic light
 ALTER TABLE public.food_items
-  ADD COLUMN IF NOT EXISTS description TEXT,
-  ADD COLUMN IF NOT EXISTS traffic_light TEXT NOT NULL DEFAULT 'GREEN';
+  ADD COLUMN IF NOT EXISTS traffic_light TEXT NOT NULL DEFAULT 'SAFE';
 
 DO $$
 BEGIN
@@ -35,8 +34,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.food_items
       ADD CONSTRAINT chk_food_items_traffic_light_valid
-      CHECK (traffic_light IN ('GREEN', 'YELLOW', 'RED'));
+      CHECK (traffic_light IN ('SAFE', 'CAUTION', 'AVOID'));
   END IF;
 END
 $$;
-

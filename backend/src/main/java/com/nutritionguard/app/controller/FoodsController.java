@@ -24,7 +24,9 @@ public class FoodsController {
       int offset = parseInt(ctx.request().getParam("offset"), 0, 0, 10_000);
 
       profiles.getProfile(userId).compose(profile -> {
-        JsonObject health = profile == null ? new JsonObject() : profile.getJsonObject("health_metadata", new JsonObject());
+        JsonObject health = profile == null
+          ? new JsonObject()
+          : profile.getJsonObject("health_metadata", new JsonObject()).copy().put("goal", profile.getString("goal", ""));
         return foods.list(q, limit, offset).map(items -> applyTrafficLights(items, health));
       })
         .onSuccess(list -> ctx.response().putHeader("Content-Type", "application/json").end(list.encode()))
@@ -55,4 +57,3 @@ public class FoodsController {
     }
   }
 }
-

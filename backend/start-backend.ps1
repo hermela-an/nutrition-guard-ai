@@ -114,11 +114,11 @@ $port = 8080
 if ($env:APP_PORT) { $port = [int]$env:APP_PORT }
 $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($listener) {
-  $pid = $listener.OwningProcess
+  $procId = $listener.OwningProcess
   $proc = $null
-  try { $proc = Get-Process -Id $pid -ErrorAction Stop } catch {}
+  try { $proc = Get-Process -Id $procId -ErrorAction Stop } catch {}
   $name = if ($proc) { $proc.ProcessName } else { "unknown" }
-  Write-Error "Port $port is already in use by PID $pid ($name). Stop that backend first (or change APP_PORT in .env)."
+  Write-Error "Port $port is already in use by PID $procId ($name). Stop that backend first (or change APP_PORT in .env)."
   exit 1
 }
 

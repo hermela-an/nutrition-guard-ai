@@ -2,7 +2,7 @@
   <div>
     <div class="eyebrow">Admin</div>
     <h2>Food Management</h2>
-    <p class="muted">Search foods, review nutrition values, and manage safety labels.</p>
+    <p class="muted">Search foods, review nutrition values, and manage traffic-light labels.</p>
   </div>
   <div class="actions">
     <a class="btn ghost" routerLink="/dashboard">Open user app</a>
@@ -27,10 +27,10 @@
         <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
       </select>
       <select class="input" style="max-width:200px;" [(ngModel)]="lightFilter" (change)="applyFilters(true)">
-        <option value="ALL">All safety</option>
-        <option value="GREEN">Safe</option>
-        <option value="YELLOW">Caution</option>
-        <option value="RED">Avoid</option>
+        <option value="ALL">All traffic lights</option>
+        <option value="SAFE">Safe</option>
+        <option value="CAUTION">Caution</option>
+        <option value="AVOID">Avoid</option>
       </select>
     </div>
   </div>
@@ -49,6 +49,12 @@
         <input class="input" type="text" [(ngModel)]="form.food_name" />
       </label>
       <label>
+        <span class="label">Category</span>
+        <select class="input" [(ngModel)]="form.category">
+          <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+        </select>
+      </label>
+      <label>
         <span class="label">Meal type *</span>
         <select class="input" [(ngModel)]="form.meal_type">
           <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
@@ -56,7 +62,7 @@
       </label>
 
       <label>
-        <span class="label">Safety label</span>
+        <span class="label">Traffic light</span>
         <select class="input" [(ngModel)]="form.traffic_light">
           <option *ngFor="let t of trafficLights" [value]="t">{{ t }}</option>
         </select>
@@ -107,13 +113,21 @@
         <input class="input" type="number" [(ngModel)]="form.sodium_mg" />
       </label>
 
+      <div style="grid-column: 1 / -1; margin-top:6px;">
+        <div class="muted small">Health effect (per condition)</div>
+        <div class="grid-2" style="gap:10px; margin-top:8px;">
+          <label *ngFor="let h of healthEffectKeys">
+            <span class="label">{{ h.label }}</span>
+            <select class="input" [(ngModel)]="healthEffect[h.key]">
+              <option *ngFor="let opt of healthEffectOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
       <label style="grid-column: 1 / -1;">
         <span class="label">Definition</span>
         <textarea class="input" rows="3" [(ngModel)]="form.definition"></textarea>
-      </label>
-      <label style="grid-column: 1 / -1;">
-        <span class="label">Description</span>
-        <textarea class="input" rows="3" [(ngModel)]="form.description"></textarea>
       </label>
     </div>
 
@@ -125,7 +139,7 @@
   <div class="card">
     <div class="card-head">
       <h3>Foods ({{ filteredFoods.length }})</h3>
-      <span class="muted">Image + macros + safety label</span>
+      <span class="muted">Image + macros + traffic light</span>
     </div>
 
     <div class="table-wrap" style="margin-top:12px;" *ngIf="pagedFoods.length > 0; else empty">
@@ -135,7 +149,7 @@
             <th>ID</th>
             <th>Food</th>
             <th>Meal</th>
-            <th>Safety</th>
+            <th>Traffic light</th>
             <th>Calories</th>
             <th>Macros</th>
             <th style="text-align:right;">Actions</th>
@@ -155,7 +169,7 @@
               </div>
             </td>
             <td>{{ f.meal_type }}</td>
-            <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'GREEN' }}</span></td>
+            <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
             <td>{{ f.calories | number:'1.0-0' }}</td>
             <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
             <td>

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { AuthService } from './auth.service';
 
@@ -18,9 +19,10 @@ export interface AdminFoodItem {
   cholesterol_mg: number;
   vitamins?: Record<string, unknown> | null;
   image_url?: string | null;
+  category?: string | null;
   definition?: string | null;
-  description?: string | null;
-  traffic_light?: 'GREEN' | 'YELLOW' | 'RED' | string;
+  health_effect?: Record<string, 'good' | 'neutral' | 'bad' | string> | null;
+  traffic_light?: 'SAFE' | 'CAUTION' | 'AVOID' | string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -32,7 +34,14 @@ export class AdminFoodsService {
     const limit = String(opts?.limit ?? 50);
     const offset = String(opts?.offset ?? 0);
     const query = q ? `?q=${q}&limit=${limit}&offset=${offset}` : `?limit=${limit}&offset=${offset}`;
-    return this.api.get<AdminFoodItem[]>(`/api/admin/foods${query}`, this.auth.authHeaders());
+    return this.api.get<unknown>(`/api/admin/foods${query}`, this.auth.authHeaders()).pipe(
+      map((res) => {
+        if (Array.isArray(res)) return res as AdminFoodItem[];
+        const maybeItems = (res as any)?.items;
+        if (Array.isArray(maybeItems)) return maybeItems as AdminFoodItem[];
+        return [];
+      })
+    );
   }
 
   create(payload: Partial<AdminFoodItem>): Observable<AdminFoodItem> {

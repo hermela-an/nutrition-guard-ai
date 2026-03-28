@@ -2,7 +2,7 @@
   <div>
     <div class="eyebrow">Admin</div>
     <h2>Overview</h2>
-    <p class="muted">A quick snapshot of users, foods, and safety alerts.</p>
+    <p class="muted">A quick snapshot of users, foods, and traffic-light alerts.</p>
   </div>
   <div class="actions">
     <button type="button" class="btn ghost" (click)="refresh()">Refresh</button>
@@ -68,7 +68,7 @@
           <strong>{{ f.food_name }}</strong>
           <span class="muted">{{ f.calories | number:'1.0-0' }} cal · {{ f.meal_type }}</span>
         </div>
-        <span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ (f.traffic_light || 'GREEN') }}</span>
+        <span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ (f.traffic_light || 'SAFE') }}</span>
       </div>
     </div>
   </div>

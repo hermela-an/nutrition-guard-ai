@@ -8,6 +8,7 @@ import { Subscription, timer } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { ToastContainerComponent } from './toast-container.component';
 import { ConfirmDialogHostComponent } from './confirm-dialog-host.component';
+import { ToastService } from '../services/toast.service';
 
 interface MenuItem {
   label: string;
@@ -23,7 +24,13 @@ interface MenuItem {
       <aside class="sidebar">
         <a class="brand" routerLink="/"><span class="brand-dot"></span> NutriGuard AI</a>
         <nav class="menu">
-          <a *ngFor="let item of items" [routerLink]="item.path" routerLinkActive="active">
+          <a
+            *ngFor="let item of items"
+            [routerLink]="item.path"
+            [attr.href]="item.path"
+            routerLinkActive="active"
+            (click)="onNavClick(item.path, $event)"
+          >
             <span>{{ item.label }}</span>
             <span *ngIf="item.path === '/notifications' && unreadCount > 0" class="notif-badge">{{ unreadCount }}</span>
           </a>
@@ -71,7 +78,8 @@ export class AppShellComponent implements OnInit, OnDestroy {
   constructor(
     private readonly auth: AuthService,
     private readonly router: Router,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly toast: ToastService
   ) {}
 
   ngOnInit(): void {
@@ -90,6 +98,27 @@ export class AppShellComponent implements OnInit, OnDestroy {
   logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);
+  }
+
+  onNavClick(path: string, event: MouseEvent): void {
+    // Preserve browser default behavior for modified clicks (new tab/window).
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+
+    // Stop routerLink from preventing default if navigation fails/cancels.
+    // We'll decide if we need to hard-navigate.
+    event.preventDefault();
+
+    this.router
+      .navigateByUrl(path)
+      .then((ok) => {
+        if (ok) return;
+        this.toast.error('Navigation was blocked. Reloading…');
+        window.location.assign(path);
+      })
+      .catch(() => {
+        this.toast.error('Navigation error. Reloading…');
+        window.location.assign(path);
+      });
   }
 }
 

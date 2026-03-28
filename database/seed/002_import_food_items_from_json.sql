@@ -26,9 +26,9 @@ WITH incoming AS (
         'Fresh carrots',
         'https://example.com/images/carrots.jpg',
         'Root vegetable rich in beta-carotene (provitamin A).',
-        'GREEN',
+        'SAFE',
         'Excellent source of vitamin A for eye health and immunity.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Sweet Potato',
@@ -48,9 +48,9 @@ WITH incoming AS (
         'Fresh sweet potato',
         'https://example.com/images/sweet-potato.jpg',
         'Starchy root vegetable high in beta-carotene.',
-        'GREEN',
+        'SAFE',
         'One of the best plant sources of vitamin A.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Broccoli',
@@ -70,11 +70,11 @@ WITH incoming AS (
         'Fresh broccoli florets',
         'https://example.com/images/broccoli.jpg',
         'Cruciferous vegetable loaded with antioxidants.',
-        'GREEN',
+        'SAFE',
         'Outstanding source of vitamin C and K.',
-        'GREEN'
+        'SAFE'
       ),
-        ('Kale', 'snack', 100::numeric, 'g', 35::numeric, 2.9::numeric, 4.4::numeric, 1.5::numeric, 4.1::numeric, 1::numeric, 53::numeric, 0::numeric, 15::numeric, '{"vitamin_a":"206%","vitamin_c":"134%","vitamin_k":"1024%","vitamin_b6":"15%"}'::jsonb, 'Fresh kale leaves', 'https://example.com/images/kale.jpg', 'Leafy green superfood.', 'GREEN', 'Extremely high in vitamins A, C, and especially K.', 'GREEN')
+        ('Kale', 'snack', 100::numeric, 'g', 35::numeric, 2.9::numeric, 4.4::numeric, 1.5::numeric, 4.1::numeric, 1::numeric, 53::numeric, 0::numeric, 15::numeric, '{"vitamin_a":"206%","vitamin_c":"134%","vitamin_k":"1024%","vitamin_b6":"15%"}'::jsonb, 'Fresh kale leaves', 'https://example.com/images/kale.jpg', 'Leafy green superfood.', 'SAFE', 'Extremely high in vitamins A, C, and especially K.', 'SAFE')
       ,
       (
         'Guava',
@@ -94,9 +94,9 @@ WITH incoming AS (
         'Fresh guava fruit',
         'https://example.com/images/guava.jpg',
         'Tropical fruit exceptionally high in vitamin C.',
-        'GREEN',
+        'SAFE',
         'One of the richest sources of vitamin C among fruits.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Kiwi',
@@ -116,9 +116,9 @@ WITH incoming AS (
         'Fresh kiwi fruit',
         'https://example.com/images/kiwi.jpg',
         'Small fruit with edible seeds.',
-        'GREEN',
+        'SAFE',
         'Excellent vitamin C content and good source of vitamin K.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Mackerel',
@@ -138,9 +138,9 @@ WITH incoming AS (
         'Fresh mackerel fillet',
         'https://example.com/images/mackerel.jpg',
         'Oily fish rich in omega-3 fatty acids.',
-        'GREEN',
+        'SAFE',
         'Great source of vitamin D and multiple B vitamins.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Almonds',
@@ -160,9 +160,9 @@ WITH incoming AS (
         'Raw almonds',
         'https://example.com/images/almonds.jpg',
         'Nut high in healthy fats and vitamin E.',
-        'GREEN',
+        'SAFE',
         'Top plant source of vitamin E.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Strawberries',
@@ -182,9 +182,9 @@ WITH incoming AS (
         'Fresh strawberries',
         'https://example.com/images/strawberries.jpg',
         'Sweet red berry fruit.',
-        'GREEN',
+        'SAFE',
         'Delicious and high in vitamin C.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Sunflower Seeds',
@@ -204,9 +204,9 @@ WITH incoming AS (
         'Raw sunflower seeds',
         'https://example.com/images/sunflower-seeds.jpg',
         'Edible seeds from the sunflower plant.',
-        'GREEN',
+        'SAFE',
         'Rich in vitamin E and several B vitamins.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Mushrooms (UV-exposed)',
@@ -226,9 +226,9 @@ WITH incoming AS (
         'White button mushrooms exposed to UV light',
         'https://example.com/images/mushrooms.jpg',
         'Fungi that produce vitamin D when exposed to sunlight/UV.',
-        'GREEN',
+        'SAFE',
         'One of the few plant sources of vitamin D.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Chicken Breast',
@@ -248,9 +248,9 @@ WITH incoming AS (
         'Grilled chicken breast',
         'https://example.com/images/chicken-breast.jpg',
         'Lean poultry meat.',
-        'GREEN',
+        'SAFE',
         'Excellent source of niacin (B3) and B6.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Brussels Sprouts',
@@ -270,9 +270,9 @@ WITH incoming AS (
         'Fresh Brussels sprouts',
         'https://example.com/images/brussels-sprouts.jpg',
         'Small cruciferous vegetable.',
-        'GREEN',
+        'SAFE',
         'High in vitamin C and K.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Tuna (canned in water)',
@@ -292,9 +292,9 @@ WITH incoming AS (
         'Canned tuna in water',
         'https://example.com/images/tuna.jpg',
         'Canned fish rich in protein.',
-        'GREEN',
+        'SAFE',
         'Good source of B3, B12, and some vitamin D.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Pumpkin',
@@ -314,9 +314,9 @@ WITH incoming AS (
         'Fresh pumpkin flesh',
         'https://example.com/images/pumpkin.jpg',
         'Winter squash variety.',
-        'GREEN',
+        'SAFE',
         'Rich in beta-carotene (vitamin A).',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Yogurt (plain, low-fat)',
@@ -336,9 +336,9 @@ WITH incoming AS (
         'Pasteurized milk, live cultures',
         'https://example.com/images/yogurt.jpg',
         'Fermented dairy product.',
-        'GREEN',
+        'SAFE',
         'Provides B2, B12, and often fortified with vitamin D.',
-        'GREEN'
+        'SAFE'
       ),
       (
         'Pork Tenderloin',
@@ -358,9 +358,9 @@ WITH incoming AS (
         'Lean pork tenderloin',
         'https://example.com/images/pork-tenderloin.jpg',
         'Lean cut of pork.',
-        'GREEN',
+        'SAFE',
         'One of the best sources of thiamine (B1).',
-        'GREEN'
+        'SAFE'
       )
   ) AS v(
     food_name,
@@ -380,8 +380,7 @@ WITH incoming AS (
     ingredients,
     image_url,
     definition,
-    safety_status,
-    description,
+    definition_extra,
     traffic_light
   )
 )
@@ -403,8 +402,6 @@ INSERT INTO public.food_items (
   ingredients,
   image_url,
   definition,
-  safety_status,
-  description,
   traffic_light
 )
 SELECT
@@ -424,10 +421,8 @@ SELECT
   COALESCE(i.vitamins, '{}'::jsonb),
   NULLIF(BTRIM(i.ingredients), ''),
   NULLIF(BTRIM(i.image_url), ''),
-  NULLIF(BTRIM(i.definition), ''),
-  NULLIF(BTRIM(i.safety_status), ''),
-  NULLIF(BTRIM(i.description), ''),
-  UPPER(COALESCE(NULLIF(BTRIM(i.traffic_light), ''), 'GREEN'))
+  NULLIF(BTRIM(COALESCE(i.definition, i.definition_extra)), ''),
+  UPPER(COALESCE(NULLIF(BTRIM(i.traffic_light), ''), 'SAFE'))
 FROM incoming i
 WHERE NOT EXISTS (
   SELECT 1

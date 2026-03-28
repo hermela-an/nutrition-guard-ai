@@ -36,12 +36,13 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CorsHandler;
 
+import java.util.UUID;
 import java.util.Set;
 
 public class AppVerticle extends AbstractVerticle {
   private final Database db;
   private final AppConfig config;
-  private static final String BUILD_TAG = "foodrepo-jsonb-v3";
+  private static final String BUILD_TAG = "foodrepo-v4-adminfoods-fix";
 
   public AppVerticle(Database db, AppConfig config) {
     this.db = db;
@@ -67,6 +68,41 @@ public class AppVerticle extends AbstractVerticle {
       .allowedHeader("Content-Type")
       .allowedHeader("Authorization"));
     router.route().handler(BodyHandler.create());
+
+    // Surface handler exceptions (otherwise clients just see "Internal Server Error" with no context).
+    // Keep the response plain-text so the Angular app can display it directly.
+    router.route().failureHandler(ctx -> {
+      if (ctx.response().ended()) return;
+      Throwable failure = ctx.failure();
+      int status = ctx.statusCode();
+      if (status <= 0) status = 500;
+
+      String requestId = UUID.randomUUID().toString();
+      String method = ctx.request().method().name();
+      String path = ctx.request().path();
+
+      if (failure != null) {
+        System.err.printf("REQ %s %s %s -> %d %s%n", requestId, method, path, status, failure);
+        failure.printStackTrace();
+      } else {
+        System.err.printf("REQ %s %s %s -> %d (no failure)%n", requestId, method, path, status);
+      }
+
+      String message;
+      if (failure != null && failure.getMessage() != null && !failure.getMessage().isBlank()) {
+        message = failure.getMessage().trim();
+      } else if (failure != null) {
+        message = failure.toString();
+      } else {
+        message = "Request failed";
+      }
+
+      // Include requestId to correlate with server logs.
+      ctx.response()
+        .setStatusCode(status)
+        .putHeader("Content-Type", "text/plain; charset=utf-8")
+        .end(message + " (requestId=" + requestId + ")");
+    });
 
     ProfileService profileService = new ProfileService(new ProfileRepository(db));
     FoodRepository foodRepository = new FoodRepository(db);
@@ -112,7 +148,7 @@ public class AppVerticle extends AbstractVerticle {
     new ChatController(vertx, profileService, foodSearchService, notificationService).mount(router);
     new NotificationController(notificationService).mount(router);
 
-    router.get("/health").handler(ctx -> ctx.end("OK"));
+    router.get("/health").handler(ctx -> ctx.end("OK " + BUILD_TAG));
 
     io.vertx.core.http.HttpServer server = vertx.createHttpServer();
     server.webSocketHandler(ws -> {

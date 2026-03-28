@@ -42,7 +42,8 @@ public class ChatController {
 
     profiles.getProfile(userId).onSuccess(profile -> {
       if (profile == null) return;
-      JsonObject health = profile.getJsonObject("health_metadata", new JsonObject());
+      JsonObject health = profile.getJsonObject("health_metadata", new JsonObject()).copy();
+      health.put("goal", profile.getString("goal", ""));
       foods.search(hint, health).onSuccess(results -> {
         if (results == null || results.isEmpty()) return;
 
@@ -51,7 +52,8 @@ public class ChatController {
         for (int i = 0; i < results.size(); i++) {
           JsonObject item = results.getJsonObject(i);
           if (item == null) continue;
-          if ("RED".equalsIgnoreCase(item.getString("traffic_light"))) {
+          String light = item.getString("traffic_light");
+          if ("AVOID".equalsIgnoreCase(light) || "RED".equalsIgnoreCase(light)) {
             red++;
             if (examples.size() < 2) {
               examples.add(item.getString("food_name", "Food"));
@@ -64,7 +66,7 @@ public class ChatController {
           userId,
           NotificationService.TYPE_ALERT,
           "Chat food alert",
-          "A food you asked about may be flagged as RED for your health profile.",
+          "A food you asked about may be flagged as Avoid for your health profile.",
           new JsonObject().put("hint", hint).put("red_count", red).put("examples", examples)
         ).onFailure(err -> err.printStackTrace());
       }).onFailure(err -> err.printStackTrace());

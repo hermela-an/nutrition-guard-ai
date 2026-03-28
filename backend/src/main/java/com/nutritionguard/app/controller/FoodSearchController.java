@@ -30,7 +30,9 @@ public class FoodSearchController {
         if (profile == null) {
           return io.vertx.core.Future.failedFuture("Profile not found");
         }
-        return foodSearch.search(query == null ? "" : query, profile.getJsonObject("health_metadata"));
+        JsonObject health = profile.getJsonObject("health_metadata", new JsonObject()).copy();
+        health.put("goal", profile.getString("goal", ""));
+        return foodSearch.search(query == null ? "" : query, health);
       }).onSuccess(result -> {
           maybeNotifySearch(userId, query, result);
           recordSearch(userId, query, result);
@@ -52,7 +54,8 @@ public class FoodSearchController {
       for (int i = 0; i < result.size(); i++) {
         JsonObject item = result.getJsonObject(i);
         if (item == null) continue;
-        if ("RED".equalsIgnoreCase(item.getString("traffic_light"))) {
+        String light = item.getString("traffic_light");
+        if ("AVOID".equalsIgnoreCase(light) || "RED".equalsIgnoreCase(light)) {
           redCount++;
         }
       }
@@ -68,7 +71,8 @@ public class FoodSearchController {
     for (int i = 0; i < result.size(); i++) {
       JsonObject item = result.getJsonObject(i);
       if (item == null) continue;
-      if ("RED".equalsIgnoreCase(item.getString("traffic_light"))) {
+      String light = item.getString("traffic_light");
+      if ("AVOID".equalsIgnoreCase(light) || "RED".equalsIgnoreCase(light)) {
         redCount++;
         if (examples.size() < 3) {
           examples.add(item.getString("food_name", "Food"));
@@ -81,8 +85,8 @@ public class FoodSearchController {
     String q = (query == null ? "" : query).trim();
     String title = "Food safety alert";
     String message = q.isEmpty()
-      ? "Some foods in your results are flagged as RED for your health profile."
-      : "Some foods matching \"" + q + "\" are flagged as RED for your health profile.";
+      ? "Some foods in your results are flagged as Avoid for your health profile."
+      : "Some foods matching \"" + q + "\" are flagged as Avoid for your health profile.";
 
     notifications.create(
       userId,

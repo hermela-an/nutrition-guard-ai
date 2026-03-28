@@ -20,8 +20,8 @@ public class AdminStatsController {
     router.get("/api/admin/stats").handler(ctx -> {
       Future<Integer> totalUsers = users.count(null, "ALL");
       Future<Integer> totalFoods = foods.countAll();
-      Future<Integer> avoidFoods = foods.countByTrafficLight("RED");
-      Future<Integer> cautionFoods = foods.countByTrafficLight("YELLOW");
+      Future<Integer> avoidFoods = foods.countByTrafficLight("AVOID");
+      Future<Integer> cautionFoods = foods.countByTrafficLight("CAUTION");
 
       CompositeFuture.all(totalUsers, totalFoods, avoidFoods, cautionFoods)
         .onSuccess(ignored -> {

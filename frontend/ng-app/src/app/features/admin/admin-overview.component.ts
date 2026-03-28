@@ -71,7 +71,10 @@ export class AdminOverviewComponent {
       )
       .subscribe({
         next: (items) => {
-          const list = (items ?? []).filter((f) => (f.traffic_light ?? '').toString().toUpperCase() === 'RED');
+          const list = (items ?? []).filter((f) => {
+            const light = (f.traffic_light ?? '').toString().toUpperCase();
+            return light === 'AVOID' || light === 'RED';
+          });
           this.riskyFoods = list.slice(0, 6);
         },
         error: (err) => (this.error = this.error || this.errorFrom(err, 'Failed to load risky foods panel.'))
@@ -101,8 +104,8 @@ export class AdminOverviewComponent {
 
   lightClass(light: string | null | undefined): 'safe' | 'caution' | 'avoid' {
     const normalized = (light ?? '').toString().toUpperCase();
-    if (normalized === 'RED') return 'avoid';
-    if (normalized === 'YELLOW') return 'caution';
+    if (normalized === 'AVOID' || normalized === 'RED') return 'avoid';
+    if (normalized === 'CAUTION' || normalized === 'YELLOW') return 'caution';
     return 'safe';
   }
 
