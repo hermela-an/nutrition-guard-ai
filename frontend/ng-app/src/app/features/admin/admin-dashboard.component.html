@@ -1,4 +1,4 @@
-<div class="page-header">
+﻿<div class="page-header">
   <div>
     <div class="eyebrow">Admin</div>
     <h2>Food Management</h2>
@@ -156,7 +156,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let f of pagedFoods; trackBy: trackById">
+          <tr *ngFor="let f of pagedFoods; let i = index; trackBy: trackById">
             <td class="muted small">{{ f.id }}</td>
             <td>
               <div class="row-media">
@@ -194,3 +194,4 @@
     </div>
   </div>
 </div>
+

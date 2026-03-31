@@ -34,4 +34,4 @@ if ($listener) {
 Write-Host ""
 Write-Host "Starting backend application (local Postgres)..."
 Set-Location $PSScriptRoot
-mvn -DskipTests compile exec:java
+mvn -DskipTests clean compile exec:java

@@ -1,6 +1,7 @@
 package com.nutritionguard.app.repository;
 
 import com.nutritionguard.app.db.Database;
+import com.nutritionguard.app.util.RowJsonUtil;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -148,7 +149,7 @@ public class FoodRepository {
       SELECT *
       FROM normalized
       WHERE ($1 = '' OR LOWER(COALESCE(food_name, '')) LIKE LOWER($2))
-      ORDER BY food_name
+      ORDER BY id ASC
       LIMIT $3 OFFSET $4
       """;
 
@@ -326,14 +327,25 @@ public class FoodRepository {
         sodium_mg = COALESCE($12, sodium_mg),
         cholesterol_mg = COALESCE($13, cholesterol_mg),
         vitamins = COALESCE($14::jsonb, vitamins),
-        health_effect = COALESCE($15::jsonb, health_effect),
-        image_url = COALESCE($16, image_url),
-        definition = COALESCE($17, definition),
-        traffic_light = COALESCE($18, traffic_light)
-      WHERE id = $1
-      RETURNING
-        id,
-        traffic_light,
+         health_effect = COALESCE($15::jsonb, health_effect),
+         image_url = COALESCE($16, image_url),
+         definition = COALESCE($17, definition),
+         traffic_light = COALESCE(
+           $18,
+           CASE UPPER(COALESCE(traffic_light, ''))
+             WHEN 'GREEN' THEN 'SAFE'
+             WHEN 'YELLOW' THEN 'CAUTION'
+             WHEN 'RED' THEN 'AVOID'
+             WHEN 'SAFE' THEN 'SAFE'
+             WHEN 'CAUTION' THEN 'CAUTION'
+             WHEN 'AVOID' THEN 'AVOID'
+             ELSE 'SAFE'
+           END
+       )
+       WHERE id = $1
+       RETURNING
+         id,
+         traffic_light,
         food_name,
         category,
         definition,
@@ -568,7 +580,7 @@ public class FoodRepository {
           items.add(new JsonObject()
             .put("id", row.getInteger("id"))
             .put("food_name", row.getString("food_name"))
-            .put("vitamins", row.getJsonObject("vitamins"))
+            .put("vitamins", RowJsonUtil.getJsonObject(row, "vitamins"))
             .put("vitamin_value", row.getString("vitamin_value"))
           );
         }
@@ -602,8 +614,8 @@ public class FoodRepository {
       .put("sugar_g", row.getDouble("sugar_g"))
       .put("sodium_mg", row.getDouble("sodium_mg"))
       .put("cholesterol_mg", row.getDouble("cholesterol_mg"))
-      .put("vitamins", row.getJsonObject("vitamins"))
-      .put("health_effect", row.getJsonObject("health_effect"));
+      .put("vitamins", RowJsonUtil.getJsonObject(row, "vitamins"))
+      .put("health_effect", RowJsonUtil.getJsonObject(row, "health_effect"));
   }
 
   private String normalizeLight(String raw) {

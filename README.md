@@ -29,6 +29,8 @@ NutritionGuard AI/
     README.md        # Angular architecture + page mapping
   docs/
     ARCHITECTURE.md
+    guides/          # Setup + implementation notes
+    README.md        # Docs index
   docker-compose.yml # Local PostgreSQL
 ```
 

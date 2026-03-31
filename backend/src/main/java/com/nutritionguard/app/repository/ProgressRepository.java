@@ -1,6 +1,7 @@
 package com.nutritionguard.app.repository;
 
 import com.nutritionguard.app.db.Database;
+import com.nutritionguard.app.util.RowJsonUtil;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -42,7 +43,7 @@ public class ProgressRepository {
           history.add(new JsonObject()
             .put("log_date", row.getLocalDate("log_date").toString())
             .put("weight_kg", row.getDouble("weight_kg"))
-            .put("consumed", row.getJsonObject("consumed")));
+            .put("consumed", RowJsonUtil.getJsonObject(row, "consumed")));
         }
         return history;
       });

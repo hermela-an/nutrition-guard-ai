@@ -60,6 +60,7 @@ public class AppVerticle extends AbstractVerticle {
 
     router.route().handler(CorsHandler.create("*")
       .allowedMethods(Set.of(
+        io.vertx.core.http.HttpMethod.OPTIONS,
         io.vertx.core.http.HttpMethod.GET,
         io.vertx.core.http.HttpMethod.POST,
         io.vertx.core.http.HttpMethod.PUT,
