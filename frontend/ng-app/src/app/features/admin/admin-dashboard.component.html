@@ -36,17 +36,18 @@
   </div>
 </div>
 
-<div class="grid-2" style="margin-top:12px;" *ngIf="!loading">
+<div class="admin-layout" *ngIf="!loading">
   <div class="card">
     <div class="card-head">
       <h3>{{ editing ? 'Edit food' : 'Add food' }}</h3>
       <button type="button" class="btn ghost small" *ngIf="editing" (click)="cancelEdit()">Cancel</button>
     </div>
 
-    <div class="form-grid" style="margin-top:12px;">
+    <div class="form-grid">
+      <div class="section-title">Basics</div>
       <label>
         <span class="label">Food name *</span>
-        <input class="input" type="text" [(ngModel)]="form.food_name" />
+        <input #foodNameInput class="input" type="text" [(ngModel)]="form.food_name" />
       </label>
       <label>
         <span class="label">Category</span>
@@ -67,7 +68,7 @@
           <option *ngFor="let t of trafficLights" [value]="t">{{ t }}</option>
         </select>
       </label>
-      <label>
+      <label class="span-all">
         <span class="label">Food image</span>
         <input id="foodImageFile" #imageFile class="file-input" type="file" accept="image/*" (change)="onImageSelected($event, imageFile)" />
         <div class="file-row" style="margin-top:6px;">
@@ -84,6 +85,7 @@
         </div>
       </label>
 
+      <div class="section-title">Nutrition</div>
       <label>
         <span class="label">Calories</span>
         <input class="input" type="number" [(ngModel)]="form.calories" />
@@ -109,13 +111,30 @@
         <input class="input" type="number" [(ngModel)]="form.fat_g" />
       </label>
       <label>
+        <span class="label">Fiber (g)</span>
+        <input class="input" type="number" [(ngModel)]="form.fiber_g" />
+      </label>
+      <label>
+        <span class="label">Sugar (g)</span>
+        <input class="input" type="number" [(ngModel)]="form.sugar_g" />
+      </label>
+      <label>
         <span class="label">Sodium (mg)</span>
         <input class="input" type="number" [(ngModel)]="form.sodium_mg" />
       </label>
+      <label>
+        <span class="label">Cholesterol (mg)</span>
+        <input class="input" type="number" [(ngModel)]="form.cholesterol_mg" />
+      </label>
+      <label>
+        <span class="label">Glycemic index</span>
+        <input class="input" type="number" [(ngModel)]="form.glycemic_index" />
+      </label>
 
-      <div style="grid-column: 1 / -1; margin-top:6px;">
+      <div class="section-title">Health effects</div>
+      <div class="span-all">
         <div class="muted small">Health effect (per condition)</div>
-        <div class="grid-2" style="gap:10px; margin-top:8px;">
+        <div class="health-grid">
           <label *ngFor="let h of healthEffectKeys">
             <span class="label">{{ h.label }}</span>
             <select class="input" [(ngModel)]="healthEffect[h.key]">
@@ -125,10 +144,45 @@
         </div>
       </div>
 
-      <label style="grid-column: 1 / -1;">
+      <div class="section-title">Details</div>
+      <label class="span-all">
         <span class="label">Definition</span>
         <textarea class="input" rows="3" [(ngModel)]="form.definition"></textarea>
       </label>
+
+      <label class="span-all">
+        <span class="label">Ingredients</span>
+        <textarea class="input" rows="3" [(ngModel)]="form.ingredients" placeholder="List ingredients..."></textarea>
+      </label>
+
+      <div class="section-title">Vitamins</div>
+      <div class="span-all">
+        <div class="muted small">Vitamins (JSON)</div>
+        <div class="vitamins-grid">
+          <div *ngFor="let row of vitaminRows; let i = index" class="vitamin-item">
+            <label class="vitamin-field">
+              <span class="label">Vitamin</span>
+              <input class="input" type="text" placeholder="e.g. iron" [(ngModel)]="vitaminRows[i].label" />
+            </label>
+            <label class="vitamin-field">
+              <span class="label">Value</span>
+              <input class="input" type="text" placeholder="e.g. 2 mg" [(ngModel)]="vitaminRows[i].value" />
+            </label>
+            <button
+              type="button"
+              class="btn ghost small vitamin-remove"
+              (click)="removeVitaminRow(i)"
+              [disabled]="vitaminRows.length <= 1"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+        <div class="vitamins-actions">
+          <button type="button" class="btn ghost small" (click)="addVitaminRow()">Add Vitamin</button>
+          <span class="muted small">Saved as JSON</span>
+        </div>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -152,6 +206,11 @@
             <th>Traffic light</th>
             <th>Calories</th>
             <th>Macros</th>
+            <th>Fiber/Sugar</th>
+            <th>Sodium/Chol</th>
+            <th>GI</th>
+            <th>Vitamins</th>
+            <th>Ingredients</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
@@ -172,6 +231,11 @@
             <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
             <td>{{ f.calories | number:'1.0-0' }}</td>
             <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
+            <td class="muted small">{{ f.fiber_g }}F · {{ f.sugar_g }}S</td>
+            <td class="muted small">{{ f.sodium_mg }}Na · {{ f.cholesterol_mg }}Ch</td>
+            <td class="muted small">{{ f.glycemic_index }}</td>
+            <td class="muted small">{{ vitaminsPreview(f.vitamins) }}</td>
+            <td class="muted small">{{ ingredientsPreview(f.ingredients) }}</td>
             <td>
               <div class="row-actions">
                 <button type="button" class="btn ghost small" (click)="startEdit(f)">Edit</button>

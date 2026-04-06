@@ -30,6 +30,7 @@ public class FoodRepository {
       case "vegetables", "vegetable", "veggies", "veggie" -> "Vegetables";
       case "dairy" -> "Dairy";
       case "grains", "grain" -> "Grains";
+      case "nuts and seeds", "nuts & seeds", "nuts", "nut", "seeds", "seed", "nuts_and_seeds", "nuts-and-seeds" -> "Nuts and Seeds";
       default -> "Vegetables";
     };
   }
@@ -76,10 +77,13 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
           COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
           COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
+          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
+          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
           COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          to_jsonb(food_items)->>'ingredients' AS ingredients,
           COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
@@ -139,10 +143,13 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
           COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
           COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
+          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
+          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
           COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          to_jsonb(food_items)->>'ingredients' AS ingredients,
           COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
@@ -205,10 +212,13 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
           COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
           COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
+          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
+          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
           COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          to_jsonb(food_items)->>'ingredients' AS ingredients,
           COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
@@ -228,6 +238,8 @@ public class FoodRepository {
     JsonObject safe = input == null ? new JsonObject() : input;
     double portionValue = doubleFrom(safe, "portion_value", doubleFrom(safe, "portion_amount", 1.0));
     int caloriesKcal = intFrom(safe, "calories_kcal", intFrom(safe, "calories", 0));
+    String ingredients = safe.getString("ingredients");
+    if (ingredients != null && ingredients.isBlank()) ingredients = null;
 
     String sql = """
       INSERT INTO food_items (
@@ -240,16 +252,19 @@ public class FoodRepository {
         protein_g,
         carbs_g,
         fat_g,
+        fiber_g,
         sugar_g,
         sodium_mg,
         cholesterol_mg,
+        glycemic_index,
         vitamins,
+        ingredients,
         health_effect,
         image_url,
         definition,
         traffic_light
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18,$19,$20)
       RETURNING
         id,
         traffic_light,
@@ -264,10 +279,13 @@ public class FoodRepository {
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
+        (fiber_g)::double precision AS fiber_g,
         (sugar_g)::double precision AS sugar_g,
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
+        (glycemic_index)::numeric::int AS glycemic_index,
         COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        ingredients,
         COALESCE(health_effect, '{}'::jsonb) AS health_effect
       """;
 
@@ -282,10 +300,13 @@ public class FoodRepository {
         doubleFrom(safe, "protein_g", 0.0),
         doubleFrom(safe, "carbs_g", 0.0),
         doubleFrom(safe, "fat_g", 0.0),
+        doubleFrom(safe, "fiber_g", 0.0),
         doubleFrom(safe, "sugar_g", 0.0),
         doubleFrom(safe, "sodium_mg", 0.0),
         doubleFrom(safe, "cholesterol_mg", 0.0),
+        intFrom(safe, "glycemic_index", 0),
         encodeJsonOrDefault(safe, "vitamins", "{}"),
+        ingredients,
         encodeJsonOrDefault(safe, "health_effect", "{}"),
         safe.getString("image_url"),
         safe.getString("definition"),
@@ -323,15 +344,18 @@ public class FoodRepository {
         protein_g = COALESCE($8, protein_g),
         carbs_g = COALESCE($9, carbs_g),
         fat_g = COALESCE($10, fat_g),
-        sugar_g = COALESCE($11, sugar_g),
-        sodium_mg = COALESCE($12, sodium_mg),
-        cholesterol_mg = COALESCE($13, cholesterol_mg),
-        vitamins = COALESCE($14::jsonb, vitamins),
-         health_effect = COALESCE($15::jsonb, health_effect),
-         image_url = COALESCE($16, image_url),
-         definition = COALESCE($17, definition),
+        fiber_g = COALESCE($11, fiber_g),
+        sugar_g = COALESCE($12, sugar_g),
+        sodium_mg = COALESCE($13, sodium_mg),
+        cholesterol_mg = COALESCE($14, cholesterol_mg),
+        glycemic_index = COALESCE($15, glycemic_index),
+        vitamins = COALESCE($16::jsonb, vitamins),
+         health_effect = COALESCE($17::jsonb, health_effect),
+         ingredients = COALESCE($18, ingredients),
+         image_url = COALESCE($19, image_url),
+         definition = COALESCE($20, definition),
          traffic_light = COALESCE(
-           $18,
+           $21,
            CASE UPPER(COALESCE(traffic_light, ''))
              WHEN 'GREEN' THEN 'SAFE'
              WHEN 'YELLOW' THEN 'CAUTION'
@@ -357,10 +381,13 @@ public class FoodRepository {
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
+        (fiber_g)::double precision AS fiber_g,
         (sugar_g)::double precision AS sugar_g,
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
+        (glycemic_index)::numeric::int AS glycemic_index,
         COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        ingredients,
         COALESCE(health_effect, '{}'::jsonb) AS health_effect
       """;
 
@@ -376,11 +403,14 @@ public class FoodRepository {
         safe.containsKey("protein_g") ? doubleOrNull(safe.getValue("protein_g")) : null,
         safe.containsKey("carbs_g") ? doubleOrNull(safe.getValue("carbs_g")) : null,
         safe.containsKey("fat_g") ? doubleOrNull(safe.getValue("fat_g")) : null,
+        safe.containsKey("fiber_g") ? doubleOrNull(safe.getValue("fiber_g")) : null,
         safe.containsKey("sugar_g") ? doubleOrNull(safe.getValue("sugar_g")) : null,
         safe.containsKey("sodium_mg") ? doubleOrNull(safe.getValue("sodium_mg")) : null,
         safe.containsKey("cholesterol_mg") ? doubleOrNull(safe.getValue("cholesterol_mg")) : null,
+        safe.containsKey("glycemic_index") ? intOrNull(safe.getValue("glycemic_index")) : null,
         encodeJsonOrNull(safe, "vitamins"),
         encodeJsonOrNull(safe, "health_effect"),
+        safe.containsKey("ingredients") ? safe.getString("ingredients") : null,
         safe.containsKey("image_url") ? safe.getString("image_url") : null,
         safe.containsKey("definition") ? safe.getString("definition") : null,
         safe.containsKey("traffic_light") ? normalizeLight(safe.getString("traffic_light")) : null
@@ -525,10 +555,13 @@ public class FoodRepository {
           COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
           COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
           COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
+          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
           COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
           COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
           COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
+          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
           COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
+          to_jsonb(food_items)->>'ingredients' AS ingredients,
           COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
         FROM food_items
       )
@@ -611,10 +644,13 @@ public class FoodRepository {
       .put("protein_g", row.getDouble("protein_g"))
       .put("carbs_g", row.getDouble("carbs_g"))
       .put("fat_g", row.getDouble("fat_g"))
+      .put("fiber_g", row.getDouble("fiber_g"))
       .put("sugar_g", row.getDouble("sugar_g"))
       .put("sodium_mg", row.getDouble("sodium_mg"))
       .put("cholesterol_mg", row.getDouble("cholesterol_mg"))
+      .put("glycemic_index", row.getInteger("glycemic_index"))
       .put("vitamins", RowJsonUtil.getJsonObject(row, "vitamins"))
+      .put("ingredients", row.getString("ingredients"))
       .put("health_effect", RowJsonUtil.getJsonObject(row, "health_effect"));
   }
 

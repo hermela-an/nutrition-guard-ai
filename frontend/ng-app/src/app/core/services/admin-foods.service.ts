@@ -14,10 +14,13 @@ export interface AdminFoodItem {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  fiber_g: number;
   sugar_g: number;
   sodium_mg: number;
   cholesterol_mg: number;
+  glycemic_index: number;
   vitamins?: Record<string, unknown> | null;
+  ingredients?: string | null;
   image_url?: string | null;
   category?: string | null;
   definition?: string | null;

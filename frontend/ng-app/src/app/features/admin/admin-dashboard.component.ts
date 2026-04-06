@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -14,13 +14,15 @@ type FilterAll = 'ALL' | TrafficLight;
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './admin-dashboard.component.html',
-  styleUrls: []
+  styleUrls: ['./admin-dashboard.component.css']
 })
 export class AdminDashboardComponent {
   private readonly foodsApi = inject(AdminFoodsService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly confirm = inject(ConfirmDialogService);
   private readonly toast = inject(ToastService);
+
+  @ViewChild('foodNameInput') private foodNameInput?: ElementRef<HTMLInputElement>;
 
   loading = true;
   error = '';
@@ -40,10 +42,11 @@ export class AdminDashboardComponent {
   editing: AdminFoodItem | null = null;
   form: Partial<AdminFoodItem> = this.emptyForm();
   healthEffect: Record<string, string> = {};
+  vitaminRows: Array<{ label: string; value: string }> = [{ label: '', value: '' }];
 
   readonly trafficLights: TrafficLight[] = ['SAFE', 'CAUTION', 'AVOID'];
   readonly mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-  readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Protein', 'Dairy'];
+  readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Protein', 'Dairy', 'Nuts and Seeds'];
   readonly healthEffectKeys = [
     { key: 'high_bp', label: 'High BP' },
     { key: 'low_bp', label: 'Low BP' },
@@ -118,6 +121,7 @@ export class AdminDashboardComponent {
     this.editing = null;
     this.form = this.emptyForm();
     this.healthEffect = this.emptyHealthEffect();
+    this.vitaminRows = [{ label: '', value: '' }];
     this.imageName = '';
   }
 
@@ -135,20 +139,26 @@ export class AdminDashboardComponent {
       protein_g: item.protein_g,
       carbs_g: item.carbs_g,
       fat_g: item.fat_g,
+      fiber_g: (item as any).fiber_g ?? 0,
       sugar_g: item.sugar_g,
       sodium_mg: item.sodium_mg,
       cholesterol_mg: item.cholesterol_mg,
+      glycemic_index: (item as any).glycemic_index ?? 0,
+      ingredients: (item as any).ingredients ?? '',
       image_url: item.image_url ?? '',
       definition: item.definition ?? '',
       traffic_light: (item.traffic_light ?? 'SAFE') as string
     };
+    this.vitaminRows = this.vitaminRowsFrom((item as any).vitamins);
     this.imageName = item.image_url ? 'Current image' : '';
+    this.focusFirstEditField();
   }
 
   cancelEdit(): void {
     this.editing = null;
     this.form = this.emptyForm();
     this.healthEffect = this.emptyHealthEffect();
+    this.vitaminRows = [{ label: '', value: '' }];
     this.imageName = '';
   }
 
@@ -193,7 +203,8 @@ export class AdminDashboardComponent {
   }
 
   save(): void {
-    const payload = this.cleanPayload({ ...this.form, health_effect: this.cleanHealthEffect(this.healthEffect) });
+    const vitamins = this.vitaminsObjectFromRows(this.vitaminRows);
+    const payload = this.cleanPayload({ ...this.form, vitamins, health_effect: this.cleanHealthEffect(this.healthEffect) });
     if (!payload.food_name || !payload.meal_type) {
       this.error = 'Food name and meal type are required.';
       return;
@@ -282,9 +293,13 @@ export class AdminDashboardComponent {
       protein_g: 0,
       carbs_g: 0,
       fat_g: 0,
+      fiber_g: 0,
       sugar_g: 0,
       sodium_mg: 0,
       cholesterol_mg: 0,
+      glycemic_index: 0,
+      ingredients: '',
+      vitamins: {},
       image_url: '',
       category: 'Vegetables',
       definition: '',
@@ -330,6 +345,7 @@ export class AdminDashboardComponent {
 
     const portionAmount = Math.max(0, num(form.portion_amount));
     const calories = Math.max(0, Math.round(num(form.calories)));
+    const glycemicIndex = Math.max(0, Math.round(num((form as any).glycemic_index)));
 
     return {
       food_name: text(form.food_name),
@@ -345,14 +361,68 @@ export class AdminDashboardComponent {
       protein_g: Math.max(0, num(form.protein_g)),
       carbs_g: Math.max(0, num(form.carbs_g)),
       fat_g: Math.max(0, num(form.fat_g)),
+      fiber_g: Math.max(0, num((form as any).fiber_g)),
       sugar_g: Math.max(0, num(form.sugar_g)),
       sodium_mg: Math.max(0, num(form.sodium_mg)),
       cholesterol_mg: Math.max(0, num(form.cholesterol_mg)),
+      glycemic_index: glycemicIndex,
+      ingredients: text((form as any).ingredients) || null,
+      vitamins: (form as any).vitamins ?? {},
       image_url: text(form.image_url) || null,
       definition: text(form.definition) || null,
       health_effect: (form as any).health_effect ?? null,
       traffic_light: text(form.traffic_light || 'SAFE').toUpperCase()
     };
+  }
+
+  addVitaminRow(): void {
+    this.vitaminRows = [...(this.vitaminRows ?? []), { label: '', value: '' }];
+  }
+
+  removeVitaminRow(idx: number): void {
+    const next = (this.vitaminRows ?? []).filter((_, i) => i !== idx);
+    this.vitaminRows = next.length ? next : [{ label: '', value: '' }];
+  }
+
+  vitaminsPreview(raw: Record<string, unknown> | null | undefined): string {
+    const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+    if (!obj) return '—';
+    const pairs = Object.entries(obj)
+      .map(([k, v]) => [k, (v ?? '').toString().trim()] as const)
+      .filter(([k, v]) => k.trim() && v);
+    if (!pairs.length) return '—';
+    return pairs
+      .slice(0, 3)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ');
+  }
+
+  ingredientsPreview(raw: string | null | undefined): string {
+    const s = (raw ?? '').toString().trim();
+    if (!s) return '—';
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+  }
+
+  private vitaminRowsFrom(raw: Record<string, unknown> | null | undefined): Array<{ label: string; value: string }> {
+    const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+    if (!obj) return [{ label: '', value: '' }];
+    const rows = Object.entries(obj)
+      .map(([k, v]) => ({ label: k, value: (v ?? '').toString() }))
+      .filter((r) => r.label.trim() || r.value.trim());
+    return rows.length ? rows : [{ label: '', value: '' }];
+  }
+
+  private vitaminsObjectFromRows(
+    rows: Array<{ label: string; value: string }> | null | undefined
+  ): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const r of rows ?? []) {
+      const label = (r?.label ?? '').toString().trim();
+      const value = (r?.value ?? '').toString().trim();
+      if (!label || !value) continue;
+      out[label] = value;
+    }
+    return out;
   }
 
   private errorFrom(err: any, fallback: string): string {
@@ -363,5 +433,15 @@ export class AdminDashboardComponent {
     if (typeof err?.error === 'string' && err.error.trim()) return err.error;
     if (typeof err?.message === 'string' && err.message.trim()) return err.message;
     return fallback;
+  }
+
+  private focusFirstEditField(): void {
+    // Let the click event finish (button would otherwise keep focus).
+    setTimeout(() => {
+      const el = this.foodNameInput?.nativeElement;
+      if (!el) return;
+      el.focus();
+      el.select();
+    }, 0);
   }
 }
