@@ -16,7 +16,7 @@ public class Main {
     Database database = new Database(vertx, config);
 
     System.out.printf(
-      "Config: APP_PORT=%d DB_HOST=%s DB_PORT=%d DB_NAME=%s DB_SCHEMA=%s DB_USER=%s ENV_FILE=%s ADMIN_EMAILS=%s%n",
+      "Config: APP_PORT=%d DB_HOST=%s DB_PORT=%d DB_NAME=%s DB_SCHEMA=%s DB_USER=%s ENV_FILE=%s ADMIN_EMAILS=%s SMTP_HOST=%s SMTP_PORT=%d SMTP_STARTTLS=%s SMTP_FROM=%s%n",
       config.httpPort(),
       config.dbHost(),
       config.dbPort(),
@@ -25,6 +25,11 @@ public class Main {
       config.dbUser(),
       AppConfig.loadedEnvFile(),
       config.adminEmails() == null || config.adminEmails().isBlank() ? "(none)" : "(configured)"
+      ,
+      config.smtpHost() == null || config.smtpHost().isBlank() ? "(none)" : config.smtpHost(),
+      config.smtpPort(),
+      config.smtpStartTls(),
+      config.smtpFrom() == null || config.smtpFrom().isBlank() ? "(default)" : config.smtpFrom()
     );
 
     database.ping()

@@ -25,6 +25,14 @@ export class AuthService {
     );
   }
 
+  forgotPassword(email: string) {
+    return this.api.post<{ message: string }>('/api/auth/forgot-password', { email });
+  }
+
+  resetPassword(token: string, password: string) {
+    return this.api.post<{ message: string }>('/api/auth/reset-password', { token, password });
+  }
+
   token(): string | null {
     return localStorage.getItem(TOKEN_KEY);
   }

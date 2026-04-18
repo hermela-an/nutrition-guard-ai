@@ -2,11 +2,16 @@ backend/target/
 backend/.env
 backend/.env.local
 backend/.m2repo/
+backend/.m2repo_build/
+backend/.m2repo_local/
+backend/.m2/
+backend/.maven-home/
 backend/.maven_user_home/
 .m2/
 m2repo/
 **/.DS_Store
 **/node_modules/
 **/.angular/cache/
+**/.angular/
 **/dist/
 *.log

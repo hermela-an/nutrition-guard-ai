@@ -14,8 +14,16 @@ public class UserRepository {
   private final Database db;
   private Future<Void> bootstrap;
 
+  public static final String FIND_BY_EMAIL_SQL =
+    "SELECT id, email, password_hash, role, is_active FROM public.users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))";
+
   public UserRepository(Database db) {
     this.db = db;
+  }
+
+  public static String normalizeEmail(String email) {
+    if (email == null) return "";
+    return email.trim().toLowerCase();
   }
 
   private Future<Void> ensureSchema() {
@@ -85,7 +93,7 @@ public class UserRepository {
   }
 
   public Future<JsonObject> findByEmail(String email) {
-    String sql = "SELECT id, email, password_hash, role, is_active FROM users WHERE email = $1";
+    String sql = FIND_BY_EMAIL_SQL;
     return ensureSchema().compose(ignored ->
       db.query(sql, Tuple.of(email))
         .map(rows -> {

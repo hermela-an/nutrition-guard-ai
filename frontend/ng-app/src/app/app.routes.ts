@@ -4,6 +4,8 @@ import { adminGuard } from './core/guards/admin.guard';
 import { LandingComponent } from './features/landing/landing.component';
 import { LoginComponent } from './features/auth/login/login.component';
 import { SignupComponent } from './features/auth/signup/signup.component';
+import { ForgotPasswordComponent } from './features/auth/forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './features/auth/reset-password/reset-password.component';
 import { ProfileSetupComponent } from './features/profile/profile-setup.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { BmiCalculatorComponent } from './features/bmi/bmi-calculator.component';
@@ -23,6 +25,8 @@ export const routes: Routes = [
   { path: 'user', redirectTo: 'dashboard', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
+  { path: 'forgot-password', component: ForgotPasswordComponent },
+  { path: 'reset-password', component: ResetPasswordComponent },
   {
     path: 'admin',
     component: AdminLayoutComponent,

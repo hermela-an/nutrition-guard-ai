@@ -1,5 +1,7 @@
 # NutritionGuard AI - Startup Guide
 
+Important: pick **one** database mode (local or Docker) and keep both the backend + Admin Dashboard on it. Switching between `backend\.env.local` and `backend\.env` can make the dashboard appear "out of sync".
+
 ## Option 1: Local Postgres (no Docker) (recommended)
 
 ```powershell
@@ -10,7 +12,8 @@ cd backend
 .\init-local-db.ps1
 
 # 3) Start backend (uses backend/.env.local)
-.\start-backend-local.ps1
+.\start-backend.ps1 -Db local
+# or: .\start-backend-local.ps1
 ```
 
 ## Option 2: Docker Postgres
@@ -30,3 +33,4 @@ cd backend
 
 - If the port is taken, change `APP_PORT` in your env file or stop the process using the port.
 - If DB connection fails, confirm `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD` match your running Postgres.
+

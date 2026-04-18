@@ -248,7 +248,7 @@ public class FoodRepository {
         meal_type,
         portion_amount,
         portion_unit,
-        calories,
+        calories_kcal,
         protein_g,
         carbs_g,
         fat_g,
@@ -264,7 +264,7 @@ public class FoodRepository {
         definition,
         traffic_light
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18,$19,$20)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       RETURNING
         id,
         traffic_light,
@@ -275,7 +275,7 @@ public class FoodRepository {
         meal_type,
         (portion_amount)::double precision AS portion_amount,
         portion_unit,
-        (calories)::numeric::int AS calories,
+        (calories_kcal)::numeric::int AS calories,
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
@@ -284,9 +284,9 @@ public class FoodRepository {
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
         (glycemic_index)::numeric::int AS glycemic_index,
-        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        vitamins,
         ingredients,
-        COALESCE(health_effect, '{}'::jsonb) AS health_effect
+        health_effect
       """;
 
     return db
@@ -340,7 +340,7 @@ public class FoodRepository {
         meal_type = COALESCE($4, meal_type),
         portion_amount = COALESCE($5, portion_amount),
         portion_unit = COALESCE($6, portion_unit),
-        calories = COALESCE($7, calories),
+        calories_kcal = COALESCE($7, calories_kcal),
         protein_g = COALESCE($8, protein_g),
         carbs_g = COALESCE($9, carbs_g),
         fat_g = COALESCE($10, fat_g),
@@ -349,14 +349,14 @@ public class FoodRepository {
         sodium_mg = COALESCE($13, sodium_mg),
         cholesterol_mg = COALESCE($14, cholesterol_mg),
         glycemic_index = COALESCE($15, glycemic_index),
-        vitamins = COALESCE($16::jsonb, vitamins),
-         health_effect = COALESCE($17::jsonb, health_effect),
+        vitamins = COALESCE($16, vitamins),
+         health_effect = COALESCE($17, health_effect),
          ingredients = COALESCE($18, ingredients),
          image_url = COALESCE($19, image_url),
          definition = COALESCE($20, definition),
          traffic_light = COALESCE(
            $21,
-           CASE UPPER(COALESCE(traffic_light, ''))
+           CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
              WHEN 'GREEN' THEN 'SAFE'
              WHEN 'YELLOW' THEN 'CAUTION'
              WHEN 'RED' THEN 'AVOID'
@@ -377,7 +377,7 @@ public class FoodRepository {
         meal_type,
         (portion_amount)::double precision AS portion_amount,
         portion_unit,
-        (calories)::numeric::int AS calories,
+        (calories_kcal)::numeric::int AS calories,
         (protein_g)::double precision AS protein_g,
         (carbs_g)::double precision AS carbs_g,
         (fat_g)::double precision AS fat_g,
@@ -386,9 +386,9 @@ public class FoodRepository {
         (sodium_mg)::double precision AS sodium_mg,
         (cholesterol_mg)::double precision AS cholesterol_mg,
         (glycemic_index)::numeric::int AS glycemic_index,
-        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        vitamins,
         ingredients,
-        COALESCE(health_effect, '{}'::jsonb) AS health_effect
+        health_effect
       """;
 
     return db
@@ -450,8 +450,21 @@ public class FoodRepository {
     if (v instanceof String s) {
       String trimmed = s.trim();
       if (trimmed.isEmpty()) return null;
-      // If the client already sent a JSON string, pass it through when it looks valid-ish.
-      if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+      // If the client already sent JSON text, validate it before passing through.
+      if (trimmed.startsWith("{")) {
+        try {
+          return new JsonObject(trimmed).encode();
+        } catch (RuntimeException ignored) {
+          return null;
+        }
+      }
+      if (trimmed.startsWith("[")) {
+        try {
+          return new JsonArray(trimmed).encode();
+        } catch (RuntimeException ignored) {
+          return null;
+        }
+      }
       return null;
     }
 
@@ -509,8 +522,26 @@ public class FoodRepository {
     if (light.isBlank()) {
       return Future.succeededFuture(0);
     }
-    String sql = "SELECT COUNT(*)::int AS c FROM food_items WHERE UPPER(COALESCE(traffic_light, '')) = $1";
-    return db.query(sql, Tuple.of(light)).map(rows -> rows.iterator().hasNext() ? rows.iterator().next().getInteger("c") : 0);
+    String sql = """
+      WITH normalized AS (
+        SELECT
+          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
+            WHEN 'GREEN' THEN 'SAFE'
+            WHEN 'YELLOW' THEN 'CAUTION'
+            WHEN 'RED' THEN 'AVOID'
+            WHEN 'SAFE' THEN 'SAFE'
+            WHEN 'CAUTION' THEN 'CAUTION'
+            WHEN 'AVOID' THEN 'AVOID'
+            ELSE 'SAFE'
+          END AS traffic_light
+        FROM food_items
+      )
+      SELECT COUNT(*)::int AS c
+      FROM normalized
+      WHERE traffic_light = $1
+      """;
+    return db.query(sql, Tuple.of(light))
+      .map(rows -> rows.iterator().hasNext() ? rows.iterator().next().getInteger("c") : 0);
   }
 
   public Future<JsonArray> mealCandidates(String mealType) {

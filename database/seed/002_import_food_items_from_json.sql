@@ -1,8 +1,8 @@
 -- Import additional food items from a JSON-like dataset.
--- Idempotent: skips rows that already exist (by food_name, case-insensitive).
+-- Idempotent: inserts missing (food_name, meal_type) and backfills image/definition/health_effect for existing rows.
 --
 -- Note: This script does NOT require any schema changes. It inserts only into the original
--- `public.food_items` columns as they exist in your database (portion_value, calories_kcal, etc.).
+-- `public.food_items` columns as they exist in your database (portion_amount, calories_kcal, etc.).
 
 WITH incoming AS (
   SELECT *
@@ -365,7 +365,7 @@ WITH incoming AS (
   ) AS v(
     food_name,
     meal_type,
-    portion_value,
+    portion_amount,
     portion_unit,
     calories_kcal,
     protein_g,
@@ -380,14 +380,15 @@ WITH incoming AS (
     ingredients,
     image_url,
     definition,
-    definition_extra,
-    traffic_light
+    traffic_light,
+    health_effect,
+    legacy_safety_status
   )
 )
 INSERT INTO public.food_items (
   food_name,
   meal_type,
-  portion_value,
+  portion_amount,
   portion_unit,
   calories_kcal,
   protein_g,
@@ -402,12 +403,13 @@ INSERT INTO public.food_items (
   ingredients,
   image_url,
   definition,
+  health_effect,
   traffic_light
 )
 SELECT
   i.food_name,
   i.meal_type,
-  i.portion_value,
+  i.portion_amount::double precision,
   i.portion_unit,
   i.calories_kcal,
   i.protein_g,
@@ -421,11 +423,19 @@ SELECT
   COALESCE(i.vitamins, '{}'::jsonb),
   NULLIF(BTRIM(i.ingredients), ''),
   NULLIF(BTRIM(i.image_url), ''),
-  NULLIF(BTRIM(COALESCE(i.definition, i.definition_extra)), ''),
+  NULLIF(BTRIM(i.definition), ''),
+  NULLIF(BTRIM(i.health_effect), ''),
   UPPER(COALESCE(NULLIF(BTRIM(i.traffic_light), ''), 'SAFE'))
 FROM incoming i
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM public.food_items f
-  WHERE LOWER(f.food_name) = LOWER(i.food_name)
-);
+ON CONFLICT (food_name, meal_type) DO UPDATE
+SET
+  -- Keep any values that were already filled in manually; backfill missing fields only.
+  ingredients = COALESCE(NULLIF(BTRIM(public.food_items.ingredients), ''), EXCLUDED.ingredients),
+  image_url = COALESCE(NULLIF(BTRIM(public.food_items.image_url), ''), EXCLUDED.image_url),
+  definition = COALESCE(NULLIF(BTRIM(public.food_items.definition), ''), EXCLUDED.definition),
+  health_effect = COALESCE(NULLIF(BTRIM(public.food_items.health_effect), ''), EXCLUDED.health_effect),
+  traffic_light = COALESCE(NULLIF(BTRIM(public.food_items.traffic_light), ''), EXCLUDED.traffic_light),
+  vitamins = CASE
+    WHEN public.food_items.vitamins IS NULL OR public.food_items.vitamins = '{}'::jsonb THEN EXCLUDED.vitamins
+    ELSE public.food_items.vitamins
+  END;

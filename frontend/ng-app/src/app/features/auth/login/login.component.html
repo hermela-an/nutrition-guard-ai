@@ -37,6 +37,9 @@
           </div>
           <small class="error" *ngIf="showError('password', 'required')">Password is required.</small>
           <small class="error" *ngIf="showError('password', 'minlength')">Password must be at least 6 characters.</small>
+          <div style="margin-top:8px;">
+            <a routerLink="/forgot-password" style="color:var(--brand); font-weight:700; font-size:0.95rem;">Forgot password?</a>
+          </div>
         </div>
         <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">Login</button>
       </form>

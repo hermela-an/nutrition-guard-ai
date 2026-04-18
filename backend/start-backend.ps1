@@ -1,6 +1,6 @@
 param(
   [ValidateSet("auto", "local", "docker")]
-  [string]$Db = "auto"
+  [string]$Db = "local"
 )
 
 Set-Location $PSScriptRoot
@@ -9,6 +9,7 @@ $envLocal = Join-Path $PSScriptRoot ".env.local"
 $envDocker = Join-Path $PSScriptRoot ".env"
 
 if ($Db -eq "auto") {
+  # Prefer local Postgres for consistency; fall back to Docker only if no local env is present.
   $Db = (Test-Path $envLocal) ? "local" : "docker"
 }
 
@@ -106,7 +107,10 @@ Get-Content $envFile | ForEach-Object {
     $envVarName = $name.Trim()
     $envVarValue = $value.Trim().Trim('"')
     [System.Environment]::SetEnvironmentVariable($envVarName, $envVarValue, "Process")
-    Write-Host "Set environment variable: $envVarName = $envVarValue"
+
+    $displayValue = $envVarValue
+    if ($envVarName -in @("DB_PASSWORD", "JWT_SECRET")) { $displayValue = "****" }
+    Write-Host "Set environment variable: $envVarName = $displayValue"
   }
 }
 

@@ -36,6 +36,31 @@ public class AuthController {
         .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
         .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 401)).end(messageFrom(err)));
     });
+
+    router.post("/api/auth/forgot-password").handler(ctx -> {
+      JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
+      if (body == null) {
+        ctx.response().setStatusCode(400).end("Invalid JSON body");
+        return;
+      }
+      request(EventAddresses.AUTH_FORGOT_PASSWORD, body)
+        .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
+        .onFailure(err -> ctx.response()
+          .setStatusCode(200)
+          .putHeader("Content-Type", "application/json")
+          .end(new JsonObject().put("message", "If an account exists for that email, a password reset link has been sent.").encode()));
+    });
+
+    router.post("/api/auth/reset-password").handler(ctx -> {
+      JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
+      if (body == null) {
+        ctx.response().setStatusCode(400).end("Invalid JSON body");
+        return;
+      }
+      request(EventAddresses.AUTH_RESET_PASSWORD, body)
+        .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
+        .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 400)).end(messageFrom(err)));
+    });
   }
 
   private io.vertx.core.Future<JsonObject> request(String address, JsonObject body) {

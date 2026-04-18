@@ -36,6 +36,13 @@ NutritionGuard AI/
 
 ## Backend Run
 
+Tip: The repo includes helper scripts:
+- Docker DB: `backend\start-backend.ps1 -Db docker` (uses `backend\.env`)
+- Local Postgres: `backend\start-backend.ps1 -Db local` (uses `backend\.env.local`)
+
+To initialize (or re-sync) your **local** database schema + seed foods, run:
+- `backend\init-local-db.ps1` (applies `database/migrations/*.sql` then runs both `database/seed/001_food_items.sql` and `database/seed/002_import_food_items_from_json.sql`).
+
 1. Start PostgreSQL:
 ```bash
 docker compose up -d
@@ -60,6 +67,25 @@ mvn exec:java
 
 4. Health check:
 `GET http://localhost:8080/health`
+
+## Frontend Run (Angular)
+
+```powershell
+cd frontend\ng-app
+
+# Install dependencies (PowerShell execution policy may block npm.ps1; use npm.cmd)
+npm.cmd ci
+
+# Start dev server
+npm.cmd start
+```
+
+## Login Debug Checklist (User/Admin)
+
+- There is **no separate `admins` table**. Admins are rows in `public.users` with `role = 'ADMIN'`.
+- If login returns **"Invalid credentials"**, first confirm the backend is connected to the expected DB: on startup it prints `DB_PORT`, `DB_NAME`, `DB_SCHEMA`, and which `ENV_FILE` it loaded.
+- If your email is listed in `ADMIN_EMAILS`, **signup** (`/api/auth/register`) will create that account as `ADMIN` automatically.
+- To promote an existing account to admin, run `backend\make-admin.ps1 -Email you@example.com`.
 
 ## Core API Endpoints
 

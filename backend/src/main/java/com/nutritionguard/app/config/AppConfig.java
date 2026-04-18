@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,15 @@ public record AppConfig(
   String dbUser,
   String dbPassword,
   String jwtSecret,
-  String adminEmails
+  String adminEmails,
+  String frontendBaseUrl,
+  int passwordResetTtlMinutes,
+  String smtpHost,
+  int smtpPort,
+  boolean smtpStartTls,
+  String smtpUsername,
+  String smtpPassword,
+  String smtpFrom
 ) {
   private static final EnvFile ENV_FILE = EnvFile.loadFromWorkingDirectory();
 
@@ -33,7 +42,15 @@ public record AppConfig(
       strEnv("DB_USER", "nutritionguard"),
       strEnv("DB_PASSWORD", "nutritionguard"),
       strEnv("JWT_SECRET", "change-this-secret-for-prod"),
-      strEnv("ADMIN_EMAILS", strEnv("ADMIN_EMAIL", ""))
+      strEnv("ADMIN_EMAILS", strEnv("ADMIN_EMAIL", "")),
+      strEnv("FRONTEND_BASE_URL", "http://localhost:4200"),
+      intEnv("PASSWORD_RESET_TTL_MINUTES", 20),
+      strEnv("SMTP_HOST", ""),
+      intEnv("SMTP_PORT", 587),
+      boolEnv("SMTP_STARTTLS", true),
+      strEnv("SMTP_USERNAME", ""),
+      strEnv("SMTP_PASSWORD", ""),
+      strEnv("SMTP_FROM", "no-reply@nutritionguard.local")
     );
   }
 
@@ -58,6 +75,17 @@ public record AppConfig(
     }
   }
 
+  private static boolean boolEnv(String key, boolean fallback) {
+    String value = lookup(key);
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    String v = value.trim().toLowerCase();
+    if ("true".equals(v) || "1".equals(v) || "yes".equals(v) || "y".equals(v) || "on".equals(v)) return true;
+    if ("false".equals(v) || "0".equals(v) || "no".equals(v) || "n".equals(v) || "off".equals(v)) return false;
+    return fallback;
+  }
+
   private static String lookup(String key) {
     String env = System.getenv(key);
     if (env != null) {
@@ -70,27 +98,44 @@ public record AppConfig(
     static EnvFile loadFromWorkingDirectory() {
       Path cwd = Paths.get(System.getProperty("user.dir"));
 
-      // Prefer local overrides, then regular .env. Support running from either:
+      // Support running from either:
       // - backend/ (scripts)
       // - repo root (IDE / mvn from root)
-      Path local = cwd.resolve(".env.local");
-      Path regular = cwd.resolve(".env");
-      Path backendLocal = cwd.resolve("backend").resolve(".env.local");
-      Path backendRegular = cwd.resolve("backend").resolve(".env");
+      //
+      // Load BOTH .env and .env.local when present, with .env.local overriding .env.
+      EnvFile fromCwd = loadMerged(cwd.resolve(".env"), cwd.resolve(".env.local"));
+      if (fromCwd != null) return fromCwd;
 
-      if (Files.exists(local)) {
-        return new EnvFile(local.toString(), parse(local));
-      }
-      if (Files.exists(regular)) {
-        return new EnvFile(regular.toString(), parse(regular));
-      }
-      if (Files.exists(backendLocal)) {
-        return new EnvFile(backendLocal.toString(), parse(backendLocal));
-      }
-      if (Files.exists(backendRegular)) {
-        return new EnvFile(backendRegular.toString(), parse(backendRegular));
-      }
+      EnvFile fromBackend = loadMerged(
+        cwd.resolve("backend").resolve(".env"),
+        cwd.resolve("backend").resolve(".env.local")
+      );
+      if (fromBackend != null) return fromBackend;
+
       return new EnvFile(null, Map.of());
+    }
+
+    private static EnvFile loadMerged(Path regular, Path local) {
+      boolean hasRegular = Files.exists(regular);
+      boolean hasLocal = Files.exists(local);
+      if (!hasRegular && !hasLocal) {
+        return null;
+      }
+
+      Map<String, String> merged = new HashMap<>();
+      List<String> paths = new ArrayList<>();
+
+      if (hasRegular) {
+        merged.putAll(parse(regular));
+        paths.add(regular.toString());
+      }
+      if (hasLocal) {
+        merged.putAll(parse(local));
+        paths.add(local.toString());
+      }
+
+      String joined = paths.isEmpty() ? null : String.join(" + ", paths);
+      return new EnvFile(joined, Map.copyOf(merged));
     }
 
     private static Map<String, String> parse(Path file) {

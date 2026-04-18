@@ -15,7 +15,10 @@ Get-Content $envFile | ForEach-Object {
     $envVarName = $name.Trim()
     $envVarValue = $value.Trim().Trim('"')
     [System.Environment]::SetEnvironmentVariable($envVarName, $envVarValue, "Process")
-    Write-Host "Set environment variable: $envVarName = $envVarValue"
+
+    $displayValue = $envVarValue
+    if ($envVarName -in @("DB_PASSWORD", "JWT_SECRET")) { $displayValue = "****" }
+    Write-Host "Set environment variable: $envVarName = $displayValue"
   }
 }
 
@@ -42,7 +45,8 @@ if ($migrations.Count -eq 0) {
   exit 1
 }
 
-$seed = Join-Path $PSScriptRoot "..\\database\\seed\\001_food_items.sql"
+$seed1 = Join-Path $PSScriptRoot "..\\database\\seed\\001_food_items.sql"
+$seed2 = Join-Path $PSScriptRoot "..\\database\\seed\\002_import_food_items_from_json.sql"
 
 # We use psql ON_ERROR_STOP so failures are obvious.
 $env:PGPASSWORD = $dbPassword
@@ -55,19 +59,18 @@ foreach ($m in $migrations) {
   psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $m.FullName
 }
 
-if (Test-Path $seed) {
-  $countRaw = psql -t -A -h $dbHost -p $dbPort -U $dbUser -d $dbName -c "SELECT COUNT(*) FROM public.food_items;" 2>$null
-  $count = 0
-  [int]::TryParse(($countRaw | Select-Object -First 1), [ref]$count) | Out-Null
-
-  if ($count -gt 0) {
-    Write-Host "Seed data already present (food_items count=$count). Skipping seed."
-  } else {
-    Write-Host "Seeding food items..."
-    psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed
-  }
+if (Test-Path $seed1) {
+  Write-Host "Applying seed: 001_food_items.sql (idempotent)..."
+  psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed1
 } else {
-  Write-Host "Seed file not found (skipping): $seed"
+  Write-Host "Seed file not found (skipping): $seed1"
+}
+
+if (Test-Path $seed2) {
+  Write-Host "Applying seed: 002_import_food_items_from_json.sql (idempotent)..."
+  psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed2
+} else {
+  Write-Host "Seed file not found (skipping): $seed2"
 }
 
 Write-Host ""
