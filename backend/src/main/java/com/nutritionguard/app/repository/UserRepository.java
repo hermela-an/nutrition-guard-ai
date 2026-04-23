@@ -15,7 +15,7 @@ public class UserRepository {
   private Future<Void> bootstrap;
 
   public static final String FIND_BY_EMAIL_SQL =
-    "SELECT id, email, password_hash, role, is_active FROM public.users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))";
+    "SELECT id, email, password_hash, role, is_active, is_verified FROM public.users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))";
 
   public UserRepository(Database db) {
     this.db = db;
@@ -38,6 +38,7 @@ public class UserRepository {
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'USER',
         is_active BOOLEAN NOT NULL DEFAULT true,
+        is_verified BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
@@ -45,6 +46,7 @@ public class UserRepository {
         ADD COLUMN IF NOT EXISTS password_hash TEXT,
         ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'USER',
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
+        ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT true,
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (email);
@@ -75,11 +77,19 @@ public class UserRepository {
   }
 
   public Future<JsonObject> createUser(String email, String passwordHash, String role) {
+    return createUser(email, passwordHash, role, true);
+  }
+
+  public Future<JsonObject> createUser(String email, String passwordHash, String role, boolean isVerified) {
     String id = UUID.randomUUID().toString();
     String normalizedRole = normalizeRole(role);
-    String sql = "INSERT INTO users (id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, role, is_active, created_at";
+    String sql = """
+      INSERT INTO users (id, email, password_hash, role, is_verified)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, email, role, is_active, is_verified, created_at
+      """;
     return ensureSchema().compose(ignored ->
-      db.query(sql, Tuple.of(id, email, passwordHash, normalizedRole))
+      db.query(sql, Tuple.of(id, email, passwordHash, normalizedRole, isVerified))
         .map(rows -> {
           Row row = rows.iterator().next();
           return new JsonObject()
@@ -87,6 +97,7 @@ public class UserRepository {
             .put("email", row.getString("email"))
             .put("role", row.getString("role"))
             .put("is_active", row.getBoolean("is_active"))
+            .put("is_verified", row.getBoolean("is_verified"))
             .put("created_at", row.getOffsetDateTime("created_at").toString());
         })
     );
@@ -106,6 +117,7 @@ public class UserRepository {
             .put("email", row.getString("email"))
             .put("role", row.getString("role"))
             .put("is_active", row.getBoolean("is_active"))
+            .put("is_verified", row.getBoolean("is_verified"))
             .put("password_hash", row.getString("password_hash"));
         })
     );

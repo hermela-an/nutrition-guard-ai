@@ -1,0 +1,54 @@
+[
+
+  {
+  "food_name": "Misir Wat with Injera",
+
+  "definition": "Misir Wat with Injera is a traditional Ethiopian meal made from spicy red lentil stew served with injera. It is a balanced dish rich in carbohydrates (~64.4 g), plant-based protein (~14.9 g), dietary fiber (~9.3 g), and healthy fats (~9.3 g), along with key minerals like iron and potassium. It provides steady energy, supports digestion, improves heart health, helps regulate blood sugar and cholesterol levels, and supports the prevention of anemia due to its iron content.",
+
+  "ingredients": "Misir Wat with Injera is a traditional Ethiopian meal served with injera and spicy red lentil stew. The misir wat is a spicy red lentil stew made by cooking red lentils with onions, garlic, tomatoes, and berbere spice, which gives it its rich heat and deep flavor. It is typically prepared with a small amount of vegetable oil and seasoned with salt, and sometimes enhanced with ginger or paprika depending on the recipe.",
+
+  "portion": {
+    "description": "Served as a combined meal",
+    "injera": "1 medium injera (~100 g)",
+    "misir_wat": "1 cup lentil stew (~200 g)",
+    "total_weight_g": 300
+  },
+
+  "nutrition_per_serving": {
+    "calories_kcal": 381,
+    "protein_g": 14.9,
+    "carbs_g": 64.4,
+    "fat_g": 9.3,
+    "fiber_g": 9.3,
+    "sugar_g": 6.5,
+    "sodium_mg": 1196,
+    "cholesterol_mg": 0,
+    "glycemic_index": 50
+  },
+
+  "vitamins_and_minerals": {
+    "iron_mg": 5.5,
+    "potassium_mg": 650,
+    "calcium_mg": 110,
+    "magnesium_mg": 90,
+    "folate_mcg": 180,
+    "vitamin_b1_mg": 0.25,
+    "vitamin_b2_mg": 0.18,
+    "vitamin_b3_mg": 2.5,
+    "vitamin_b6_mg": 0.35
+  },
+
+  "health_effects": {
+    "high_bp": "neutral",
+    "low_bp": "good",
+    "diabetes": "neutral",
+    "high_cholesterol": "good",
+    "anemia": "good",
+    "allergy": "neutral",
+    "heart_disease": "good",
+    "kidney_disease": "neutral",
+    "weight_loss": "good",
+    "weight_gain": "good"
+  }
+}
+ ]

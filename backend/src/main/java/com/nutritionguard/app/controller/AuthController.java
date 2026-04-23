@@ -26,6 +26,28 @@ public class AuthController {
         .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 400)).end(messageFrom(err)));
     });
 
+    router.get("/api/auth/verify-email").handler(ctx -> {
+      String token = ctx.request().getParam("token");
+      JsonObject body = new JsonObject().put("token", token == null ? "" : token);
+      request(EventAddresses.AUTH_VERIFY_EMAIL, body)
+        .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
+        .onFailure(err -> ctx.response().setStatusCode(statusFrom(err, 400)).end(messageFrom(err)));
+    });
+
+    router.post("/api/auth/resend-verification").handler(ctx -> {
+      JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
+      if (body == null) {
+        ctx.response().setStatusCode(400).end("Invalid JSON body");
+        return;
+      }
+      request(EventAddresses.AUTH_RESEND_VERIFICATION, body)
+        .onSuccess(payload -> ctx.response().putHeader("Content-Type", "application/json").end(payload.encode()))
+        .onFailure(err -> ctx.response()
+          .setStatusCode(200)
+          .putHeader("Content-Type", "application/json")
+          .end(new JsonObject().put("message", "If an account exists for that email, a verification link has been sent.").encode()));
+    });
+
     router.post("/api/auth/login").handler(ctx -> {
       JsonObject body = ctx.body() == null ? null : ctx.body().asJsonObject();
       if (body == null) {

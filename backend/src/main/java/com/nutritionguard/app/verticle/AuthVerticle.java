@@ -2,9 +2,11 @@ package com.nutritionguard.app.verticle;
 
 import com.nutritionguard.app.config.AppConfig;
 import com.nutritionguard.app.db.Database;
+import com.nutritionguard.app.repository.EmailVerificationTokenRepository;
 import com.nutritionguard.app.repository.PasswordResetTokenRepository;
 import com.nutritionguard.app.repository.UserRepository;
 import com.nutritionguard.app.service.AuthService;
+import com.nutritionguard.app.service.EmailVerificationMailer;
 import com.nutritionguard.app.service.PasswordResetMailer;
 import com.nutritionguard.app.util.EventAddresses;
 import com.nutritionguard.app.util.JwtService;
@@ -25,8 +27,10 @@ public class AuthVerticle extends AbstractVerticle {
     AuthService service = new AuthService(
       new UserRepository(db),
       new PasswordResetTokenRepository(db),
+      new EmailVerificationTokenRepository(db),
       new JwtService(vertx, config),
       new PasswordResetMailer(vertx, config),
+      new EmailVerificationMailer(vertx, config),
       config
     );
 
@@ -36,13 +40,14 @@ public class AuthVerticle extends AbstractVerticle {
         msg.fail(400, "Invalid JSON body");
         return;
       }
+      String fullName = body.getString("fullName");
       String email = body.getString("email");
       String password = body.getString("password");
       if (email == null || email.isBlank() || password == null) {
         msg.fail(400, "Missing required fields: email, password");
         return;
       }
-      service.register(email, password)
+      service.register(email, password, fullName)
         .onSuccess(msg::reply)
         .onFailure(err -> msg.fail(400, err.getMessage()));
     });
@@ -96,6 +101,38 @@ public class AuthVerticle extends AbstractVerticle {
       service.resetPassword(token, password)
         .onSuccess(msg::reply)
         .onFailure(err -> msg.fail(400, err.getMessage()));
+    });
+
+    vertx.eventBus().consumer(EventAddresses.AUTH_VERIFY_EMAIL, msg -> {
+      JsonObject body = (JsonObject) msg.body();
+      if (body == null) {
+        msg.fail(400, "Invalid request");
+        return;
+      }
+      String token = body.getString("token");
+      if (token == null || token.isBlank()) {
+        msg.fail(400, "Missing required field: token");
+        return;
+      }
+      service.verifyEmail(token)
+        .onSuccess(msg::reply)
+        .onFailure(err -> msg.fail(400, err.getMessage()));
+    });
+
+    vertx.eventBus().consumer(EventAddresses.AUTH_RESEND_VERIFICATION, msg -> {
+      JsonObject body = (JsonObject) msg.body();
+      if (body == null) {
+        msg.fail(400, "Invalid JSON body");
+        return;
+      }
+      String email = body.getString("email");
+      if (email == null || email.isBlank()) {
+        msg.reply(new JsonObject().put("message", "If an account exists for that email, a verification link has been sent."));
+        return;
+      }
+      service.resendVerification(email)
+        .onSuccess(msg::reply)
+        .onFailure(err -> msg.reply(new JsonObject().put("message", "If an account exists for that email, a verification link has been sent.")));
     });
   }
 }

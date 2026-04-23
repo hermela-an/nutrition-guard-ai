@@ -30,6 +30,7 @@ public class FoodRepository {
       case "vegetables", "vegetable", "veggies", "veggie" -> "Vegetables";
       case "dairy" -> "Dairy";
       case "grains", "grain" -> "Grains";
+      case "carbohydrates", "carbohydrate", "carbs", "carb" -> "Carbohydrates";
       case "nuts and seeds", "nuts & seeds", "nuts", "nut", "seeds", "seed", "nuts_and_seeds", "nuts-and-seeds" -> "Nuts and Seeds";
       default -> "Vegetables";
     };
@@ -318,6 +319,14 @@ public class FoodRepository {
   public Future<JsonObject> update(int id, JsonObject input) {
     JsonObject safe = input == null ? new JsonObject() : input;
 
+    String normalizedCategoryOrNull = null;
+    if (safe.containsKey("category")) {
+      String rawCategory = safe.getString("category");
+      if (rawCategory != null && !rawCategory.isBlank()) {
+        normalizedCategoryOrNull = normalizeCategory(rawCategory);
+      }
+    }
+
     Double portionValue = null;
     if (safe.containsKey("portion_value")) {
       portionValue = doubleOrNull(safe.getValue("portion_value"));
@@ -395,7 +404,7 @@ public class FoodRepository {
       .query(sql, Tuple.of(
         id,
         safe.containsKey("food_name") ? safe.getString("food_name") : null,
-        safe.containsKey("category") ? normalizeCategory(safe.getString("category")) : null,
+        normalizedCategoryOrNull,
         safe.containsKey("meal_type") ? safe.getString("meal_type") : null,
         portionValue,
         safe.containsKey("portion_unit") ? safe.getString("portion_unit") : null,
@@ -665,7 +674,7 @@ public class FoodRepository {
       .put("id", row.getInteger("id"))
       .put("traffic_light", row.getString("traffic_light"))
       .put("food_name", row.getString("food_name"))
-      .put("category", row.getString("category"))
+      .put("category", normalizeCategory(row.getString("category")))
       .put("definition", row.getString("definition"))
       .put("image_url", row.getString("image_url"))
       .put("meal_type", row.getString("meal_type"))

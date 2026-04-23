@@ -36,7 +36,7 @@ public class Main {
       .compose(ok -> vertx.deployVerticle(new AuthVerticle(database, config)))
       .compose(ok -> vertx.deployVerticle(new CalculationVerticle()))
       .compose(ok -> vertx.deployVerticle(new FilterVerticle(database)))
-      .compose(ok -> vertx.deployVerticle(new SocketVerticle(database)))
+      .compose(ok -> vertx.deployVerticle(new SocketVerticle(database, config)))
       .compose(ok -> vertx.deployVerticle(new AppVerticle(database, config)))
       .onSuccess(id -> System.out.println("NutritionGuard backend started."))
       .onFailure(err -> {

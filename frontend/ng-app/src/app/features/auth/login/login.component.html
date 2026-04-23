@@ -44,6 +44,15 @@
         <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">Login</button>
       </form>
       <div *ngIf="status" class="status" [class.ok]="!error" [class.err]="error">{{ status }}</div>
+      <button
+        *ngIf="showResend"
+        class="btn secondary"
+        type="button"
+        (click)="resendVerification()"
+        [disabled]="loading"
+        style="width:100%; margin-top:10px;">
+        Resend verification email
+      </button>
       <p style="margin-top:12px; color:var(--muted);">No account? <a routerLink="/signup" style="color:var(--brand); font-weight:700;">Sign up</a></p>
     </div>
   </section>

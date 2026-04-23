@@ -6,6 +6,7 @@ import { LoginComponent } from './features/auth/login/login.component';
 import { SignupComponent } from './features/auth/signup/signup.component';
 import { ForgotPasswordComponent } from './features/auth/forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './features/auth/reset-password/reset-password.component';
+import { VerifyEmailComponent } from './features/auth/verify-email/verify-email.component';
 import { ProfileSetupComponent } from './features/profile/profile-setup.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { BmiCalculatorComponent } from './features/bmi/bmi-calculator.component';
@@ -27,6 +28,7 @@ export const routes: Routes = [
   { path: 'signup', component: SignupComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
+  { path: 'verify-email', component: VerifyEmailComponent },
   {
     path: 'admin',
     component: AdminLayoutComponent,

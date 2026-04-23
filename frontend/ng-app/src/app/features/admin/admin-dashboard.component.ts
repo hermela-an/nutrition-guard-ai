@@ -46,7 +46,7 @@ export class AdminDashboardComponent {
 
   readonly trafficLights: TrafficLight[] = ['SAFE', 'CAUTION', 'AVOID'];
   readonly mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-  readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Protein', 'Dairy', 'Nuts and Seeds'];
+  readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Carbohydrates', 'Protein', 'Dairy', 'Nuts and Seeds'];
   readonly healthEffectKeys = [
     { key: 'high_bp', label: 'High BP' },
     { key: 'low_bp', label: 'Low BP' },

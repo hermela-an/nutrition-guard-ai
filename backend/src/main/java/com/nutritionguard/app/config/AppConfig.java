@@ -27,7 +27,8 @@ public record AppConfig(
   boolean smtpStartTls,
   String smtpUsername,
   String smtpPassword,
-  String smtpFrom
+  String smtpFrom,
+  String geminiApiKey
 ) {
   private static final EnvFile ENV_FILE = EnvFile.loadFromWorkingDirectory();
 
@@ -50,7 +51,8 @@ public record AppConfig(
       boolEnv("SMTP_STARTTLS", true),
       strEnv("SMTP_USERNAME", ""),
       strEnv("SMTP_PASSWORD", ""),
-      strEnv("SMTP_FROM", "no-reply@nutritionguard.local")
+      strEnv("SMTP_FROM", "no-reply@nutritionguard.local"),
+      strEnv("GEMINI_API_KEY", "")
     );
   }
 

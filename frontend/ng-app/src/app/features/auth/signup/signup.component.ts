@@ -49,11 +49,15 @@ export class SignupComponent {
     }
     this.loading = true;
     this.status = '';
-    this.auth.register(this.form.value.email!.trim(), this.form.value.password!).subscribe({
-      next: () => {
+    this.auth.register(
+      this.form.value.email!.trim(),
+      this.form.value.password!,
+      (this.form.value.fullName ?? '').toString().trim()
+    ).subscribe({
+      next: (res) => {
         this.error = false;
-        this.status = 'Account created. Redirecting...';
-        setTimeout(() => this.router.navigateByUrl('/profile-setup'), 500);
+        this.status = res?.message || 'Account created. Please check your email to verify your account.';
+        setTimeout(() => this.router.navigateByUrl('/login'), 1200);
       },
       error: (err) => {
         this.error = true;

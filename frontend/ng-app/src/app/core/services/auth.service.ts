@@ -9,20 +9,36 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface RegisterResponse {
+  message: string;
+  user?: { id: string; email: string; role?: 'USER' | 'ADMIN' | string; is_verified?: boolean };
+}
+
+export interface VerifyEmailResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   constructor(private readonly api: ApiService) {}
 
-  register(email: string, password: string) {
-    return this.api.post<AuthResponse>('/api/auth/register', { email, password }).pipe(
-      tap((res) => this.persist(res))
-    );
+  register(email: string, password: string, fullName?: string) {
+    return this.api.post<RegisterResponse>('/api/auth/register', { email, password, fullName });
   }
 
   login(email: string, password: string) {
     return this.api.post<AuthResponse>('/api/auth/login', { email, password }).pipe(
       tap((res) => this.persist(res))
     );
+  }
+
+  verifyEmail(token: string) {
+    const safe = encodeURIComponent(token ?? '');
+    return this.api.get<VerifyEmailResponse>(`/api/auth/verify-email?token=${safe}`);
+  }
+
+  resendVerification(email: string) {
+    return this.api.post<{ message: string }>('/api/auth/resend-verification', { email });
   }
 
   forgotPassword(email: string) {

@@ -1,19 +1,121 @@
 package com.nutritionguard.app.service;
 
 import com.nutritionguard.app.repository.FoodRepository;
+import com.nutritionguard.app.config.AppConfig;
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.Function;
 
 public class VitaminChatService {
   private final FoodRepository foods;
+  private final AppConfig config;
+  private final WebClient webClient;
+  private final Function<String, Future<String>> aiCaller;
+
+  private static final int GEMINI_TIMEOUT_MS = 15_000;
+  private static final String GEMINI_MODEL = "gemini-1.5-flash";
+  private static final String GEMINI_ENDPOINT =
+    "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent";
+
+  private static final String SYSTEM_PROMPT = """
+    NutritionGuard AI – Flexible Hybrid Prompt
+
+    You are the NutritionGuard AI chatbot. You use a hybrid system (database + AI) to answer all user questions.
+
+    🧠 1. Database First (Primary Source)
+
+    When the user asks about food, nutrition, or ingredients:
+
+    First check the database for matching information.
+    If data exists:
+    Use database values (calories, protein, carbs, fats, vitamins, minerals).
+    Do NOT change or guess these values.
+    🤖 2. AI Fallback (If database is missing or incomplete)
+
+    If:
+
+    the food is NOT in the database, OR
+    the question is about cooking, explanation, health advice, or general knowledge
+
+    👉 Use AI knowledge to provide a helpful, correct, and complete answer.
+
+    🔄 3. Combined Mode (Best behavior)
+
+    If both exist:
+
+    Use database for factual nutrition data
+    Use AI for:
+    cooking instructions
+    explanations
+    health insights
+    practical advice
+    ⚠️ 4. No Blocking Rule (VERY IMPORTANT)
+
+    Do NOT reject or block questions.
+
+    Even if:
+
+    data is missing
+    question is general
+    question is cooking-related
+
+    👉 Always respond using AI when database is not enough.
+
+    Never say:
+
+    “this is only nutrition data” ❌
+    “depends on database” ❌
+
+    Instead:
+    👉 always provide a helpful answer.
+
+    🎯 Goal
+
+    Provide:
+
+    accurate nutrition from database when available
+    intelligent AI responses when not available
+    seamless experience without restrictions or missing answers
+    🧠 Final Behavior Rule
+
+    Always do this order:
+
+    Check database
+    If found → use it
+    If not found or needs explanation → use AI
+    Combine both when needed
+    Always respond fully (no empty or blocked answers)
+
+    Please format your answers nicely using standard HTML tags such as <b>, <br>, <ul>, <li>. Limit your response to 200 words.
+    """;
 
   private static final String FALLBACK_IMAGE_URL =
     "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80";
 
-  public VitaminChatService(FoodRepository foods) {
+  public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods) {
+    this(vertx, config, foods, null);
+  }
+
+  public VitaminChatService(
+    Vertx vertx,
+    AppConfig config,
+    FoodRepository foods,
+    Function<String, Future<String>> aiCaller
+  ) {
     this.foods = foods;
+    this.config = config;
+    this.webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true).setTrustAll(true));
+    this.aiCaller = aiCaller == null ? this::callGemini : aiCaller;
   }
 
   public Future<JsonObject> ask(JsonObject body) {
@@ -61,25 +163,337 @@ public class VitaminChatService {
       ));
     }
 
-    // 2. Vitamin & Food Search
+    // 2. Vitamin & Food Search (Hybrid DB + AI mode)
     String foodQuery = extractFoodQuery(q);
     if (!foodQuery.isEmpty()) {
-      return foods.search(foodQuery).map(items -> {
-        if (items == null || items.isEmpty()) return buildNoRecordFoodResponse(foodQuery);
+      return foods.search(foodQuery).compose(items -> {
+        if (items != null && !items.isEmpty()) {
+          JsonObject first = items.getJsonObject(0);
+          JsonObject dbResponse = buildFoodResponse(first, foodQuery);
+          boolean shouldAugment = shouldAugmentWithAi(body, question);
+          if (!shouldAugment) {
+            return Future.succeededFuture(dbResponse);
+          }
 
-        JsonObject first = items.getJsonObject(0);
-        return buildFoodResponse(first, foodQuery);
+          String prompt =
+            "User asked: " + question + "\n\n"
+              + "Database facts (do not alter numbers): " + first.encode() + "\n\n"
+              + "Provide a short explanation and practical advice. Do not repeat nutrition numbers; those are already shown to the user.";
+
+          return aiCaller.apply(prompt)
+            .map(aiAnswer -> {
+              String safeAi = sanitizeLimitedHtml(aiAnswer);
+              String combined = dbResponse.getString("answer", "") + "<br><br><b>AI insight</b><br>" + safeAi;
+              dbResponse.put("answer", combined);
+              return dbResponse;
+            })
+            .recover(err -> Future.succeededFuture(dbResponse));
+        } else {
+          // Food not found in DB -> AI Fallback
+          return fallbackToAI(question, buildNoRecordFoodResponse(foodQuery));
+        }
       });
     }
 
-    // 3. General Fallback
-    String definition = generateFallbackDefinition(question);
-    return Future.succeededFuture(withImageAndDefinition(
+    // 3. General Fallback -> AI mode
+    return fallbackToAI(question, Future.succeededFuture(withImageAndDefinition(
       new JsonObject(),
       FALLBACK_IMAGE_URL,
-      definition,
+      generateFallbackDefinition(question),
       "That is an interesting question! Could you try asking me about a specific food (for example: \"tell me about oats\") or hydration?"
-    ));
+    )).result());
+  }
+
+  private Future<JsonObject> fallbackToAI(String question, JsonObject defaultResponse) {
+    if (config.geminiApiKey() == null || config.geminiApiKey().isBlank()) {
+      String q = question == null ? "" : question.toLowerCase(Locale.ROOT);
+      if (isCookingQuestion(q)) {
+        String cleaned = q.replaceAll("[^a-z\\s]", " ").replaceAll("\\s+", " ").trim();
+        String food = extractCookingQuery(cleaned);
+        if (!food.isBlank()) {
+          JsonObject res = defaultResponse == null ? new JsonObject() : defaultResponse.copy();
+          res.put("name", food).put("food_name", food);
+          res.put("definition", generateFallbackDefinition(food));
+          res.put("answer", buildCookingAnswerHtml(food));
+          return Future.succeededFuture(res);
+        }
+      }
+      return Future.succeededFuture(defaultResponse);
+    }
+    return aiCaller.apply("User asked: " + question).map(aiAnswer -> {
+       defaultResponse.put("answer", sanitizeLimitedHtml(aiAnswer));
+       if (defaultResponse.getString("definition", "").isBlank()) {
+         defaultResponse.put("definition", "NutritionGuard AI Assistant");
+       }
+       return defaultResponse;
+    }).recover(err -> {
+       System.err.println("Gemini API error: " + err.getMessage());
+       return Future.succeededFuture(defaultResponse);
+    });
+  }
+
+  private boolean shouldAugmentWithAi(JsonObject body, String question) {
+    if (config.geminiApiKey() == null || config.geminiApiKey().isBlank()) return false;
+    if (explicitlyRequestsAi(body)) return true;
+
+    String q = question == null ? "" : question.toLowerCase(Locale.ROOT);
+    if (q.isBlank()) return false;
+    if (isNutritionFactsQuestion(q)) return false;
+
+    return q.contains("explain")
+      || q.contains("benefit")
+      || q.contains("good for")
+      || q.contains("healthy")
+      || q.contains("recipe")
+      || q.contains("cook")
+      || q.contains("how to")
+      || q.contains("should i")
+      || q.contains("is it safe")
+      || q.contains("side effect")
+      || q.contains("allergy");
+  }
+
+  private boolean explicitlyRequestsAi(JsonObject body) {
+    if (body == null) return false;
+    Boolean useAi = body.getBoolean("useAI");
+    if (useAi == null) useAi = body.getBoolean("useAi");
+    return Boolean.TRUE.equals(useAi);
+  }
+
+  private boolean isNutritionFactsQuestion(String qLower) {
+    if (qLower == null) return false;
+    String q = qLower.toLowerCase(Locale.ROOT);
+    return q.contains("calorie")
+      || q.contains("kcal")
+      || q.contains("protein")
+      || q.contains("carb")
+      || q.contains("fat")
+      || q.contains("fiber")
+      || q.contains("sugar")
+      || q.contains("sodium")
+      || q.contains("cholesterol")
+      || q.contains("glycemic")
+      || q.contains("nutrition facts")
+      || q.contains("nutrition of")
+      || q.contains("macros");
+  }
+
+  private boolean isCookingQuestion(String qLower) {
+    if (qLower == null) return false;
+    String q = qLower.toLowerCase(Locale.ROOT);
+    return q.contains("how to cook")
+      || q.contains("how do i cook")
+      || q.contains("recipe")
+      || q.contains("how to make")
+      || q.contains("how do i make")
+      || q.contains("cook ")
+      || q.contains("cooking ")
+      || q.contains("prepare ")
+      || q.contains("saute")
+      || q.contains("sauté")
+      || q.contains("steam ")
+      || q.contains("boil ")
+      || q.contains("roast ")
+      || q.contains("bake ")
+      || q.contains("grill ")
+      || q.contains("fry ");
+  }
+
+  private String extractCookingQuery(String cleanedLower) {
+    if (cleanedLower == null) return "";
+    String cleaned = cleanedLower.trim().toLowerCase(Locale.ROOT);
+    if (cleaned.isEmpty()) return "";
+
+    String extracted = extractAfter(cleaned, "how to cook ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how do i cook ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how do you cook ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how to make ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how do i make ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "recipe for ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "cook ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "prepare ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "steam ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "boil ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "bake ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "roast ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "grill ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "fry ");
+
+    extracted = extracted.trim();
+    extracted = extracted.replaceAll("^(a|an|the)\\s+", "");
+    extracted = extracted.replaceAll("\\s+(please|today)$", "");
+
+    if (extracted.length() > 60) extracted = extracted.substring(0, 60).trim();
+
+    // Keep up to first 4 words (food names)
+    String[] parts = extracted.split(" ");
+    if (parts.length > 4) {
+      extracted = String.join(" ", Arrays.copyOfRange(parts, 0, 4)).trim();
+    }
+
+    return extracted;
+  }
+
+  private String buildCookingAnswerHtml(String foodName) {
+    String name = (foodName == null || foodName.isBlank()) ? "this food" : escapeHtml(foodName.trim());
+    return "<b>How to cook " + name + "</b><br>"
+      + "<ul>"
+      + "<li><b>Quick sauté</b>: Heat 1–2 tsp oil, add garlic/onion (optional), add " + name + ", stir 2–4 min until just wilted/tender. Season with salt, pepper, lemon.</li>"
+      + "<li><b>Steam</b>: Steam 2–5 min until tender. Drain/squeeze excess water, season and serve.</li>"
+      + "<li><b>Blanch</b>: Boil 30–60 sec, then ice bath. Great for freezing or adding to sauces/soups.</li>"
+      + "<li><b>Tip</b>: Don’t overcook—short cooking keeps better color and texture.</li>"
+      + "</ul>";
+  }
+
+  private String sanitizeLimitedHtml(String input) {
+    if (input == null) return "";
+    String escaped = escapeHtml(input).replace("\r\n", "\n").replace("\n", "<br>");
+
+    // Unescape a small whitelist of safe tags without attributes.
+    escaped = escaped.replaceAll("(?i)&lt;\\s*b\\s*&gt;", "<b>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*b\\s*&gt;", "</b>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*br\\s*/?\\s*&gt;", "<br>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*ul\\s*&gt;", "<ul>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*ul\\s*&gt;", "</ul>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*ol\\s*&gt;", "<ol>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*ol\\s*&gt;", "</ol>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*li\\s*&gt;", "<li>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*li\\s*&gt;", "</li>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*p\\s*&gt;", "<p>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*p\\s*&gt;", "</p>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*strong\\s*&gt;", "<strong>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*strong\\s*&gt;", "</strong>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*em\\s*&gt;", "<em>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*em\\s*&gt;", "</em>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*i\\s*&gt;", "<i>");
+    escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*i\\s*&gt;", "</i>");
+
+    return escaped;
+  }
+
+  private Future<String> callGemini(String userPrompt) {
+    String apiKey = config.geminiApiKey();
+    if (apiKey == null || apiKey.isBlank()) {
+      return Future.failedFuture("Missing GEMINI_API_KEY");
+    }
+
+    String prompt = userPrompt == null ? "" : userPrompt;
+
+    JsonObject requestBody = new JsonObject()
+      .put("systemInstruction", new JsonObject()
+        .put("parts", new JsonArray().add(new JsonObject().put("text", SYSTEM_PROMPT)))
+      )
+      .put("contents", new JsonArray().add(new JsonObject()
+        .put("role", "user")
+        .put("parts", new JsonArray().add(new JsonObject().put("text", prompt)))
+      ))
+      .put("generationConfig", new JsonObject()
+        .put("temperature", 0.4)
+        .put("topP", 0.95)
+        .put("maxOutputTokens", 350)
+      );
+
+    return webClient
+      .postAbs(GEMINI_ENDPOINT)
+      .timeout(GEMINI_TIMEOUT_MS)
+      .putHeader("Content-Type", "application/json")
+      .putHeader("x-goog-api-key", apiKey.trim())
+      .sendJsonObject(requestBody)
+      .compose(response -> {
+        if (response.statusCode() != 401 && response.statusCode() != 403) {
+          return Future.succeededFuture(response);
+        }
+
+        // Some environments expect API keys via query string rather than header.
+        String encodedKey = URLEncoder.encode(apiKey.trim(), StandardCharsets.UTF_8);
+        return webClient
+          .postAbs(GEMINI_ENDPOINT + "?key=" + encodedKey)
+          .timeout(GEMINI_TIMEOUT_MS)
+          .putHeader("Content-Type", "application/json")
+          .sendJsonObject(requestBody);
+      })
+      .compose(response -> {
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+          return Future.failedFuture("Gemini HTTP Error: " + response.statusCode() + " " + safeTruncate(response.bodyAsString(), 1200));
+        }
+
+        JsonObject json;
+        try {
+          json = response.bodyAsJsonObject();
+        } catch (Exception e) {
+          return Future.failedFuture("Error parsing Gemini JSON: " + e.getMessage());
+        }
+
+        String text = extractGeminiText(json);
+        if (text == null || text.isBlank()) {
+          String reason = extractGeminiBlockReason(json);
+          if (reason == null || reason.isBlank()) reason = "Empty response";
+          return Future.failedFuture("Gemini response invalid: " + reason);
+        }
+
+        return Future.succeededFuture(text.trim());
+      });
+  }
+
+  private String extractGeminiText(JsonObject json) {
+    if (json == null) return null;
+    JsonArray candidates = json.getJsonArray("candidates");
+    if (candidates == null || candidates.isEmpty()) return null;
+
+    for (int i = 0; i < candidates.size(); i++) {
+      JsonObject candidate = candidates.getJsonObject(i);
+      if (candidate == null) continue;
+
+      JsonObject content = candidate.getJsonObject("content");
+      if (content == null) continue;
+
+      JsonArray parts = content.getJsonArray("parts");
+      if (parts == null || parts.isEmpty()) continue;
+
+      StringBuilder out = new StringBuilder();
+      for (int p = 0; p < parts.size(); p++) {
+        JsonObject part = parts.getJsonObject(p);
+        if (part == null) continue;
+        String text = part.getString("text");
+        if (text != null && !text.isBlank()) {
+          out.append(text);
+        }
+      }
+
+      String joined = out.toString().trim();
+      if (!joined.isEmpty()) return joined;
+    }
+
+    return null;
+  }
+
+  private String extractGeminiBlockReason(JsonObject json) {
+    if (json == null) return null;
+
+    JsonObject promptFeedback = json.getJsonObject("promptFeedback");
+    if (promptFeedback != null) {
+      String reason = promptFeedback.getString("blockReason");
+      if (reason != null && !reason.isBlank()) return reason;
+    }
+
+    JsonArray candidates = json.getJsonArray("candidates");
+    if (candidates != null) {
+      for (int i = 0; i < candidates.size(); i++) {
+        JsonObject candidate = candidates.getJsonObject(i);
+        if (candidate == null) continue;
+        String finishReason = candidate.getString("finishReason");
+        if (finishReason != null && !finishReason.isBlank()) return finishReason;
+      }
+    }
+
+    return null;
+  }
+
+  private String safeTruncate(String input, int maxChars) {
+    if (input == null) return "";
+    String trimmed = input.trim();
+    if (trimmed.length() <= maxChars) return trimmed;
+    return trimmed.substring(0, Math.max(0, maxChars)).trim() + "...";
   }
 
   private boolean isGreeting(String q) {
@@ -105,13 +519,96 @@ public class VitaminChatService {
     String imageUrl = resolveImageUrl(food);
 
     return withImageAndDefinition(
-      new JsonObject()
+      (food == null ? new JsonObject() : food.copy())
         .put("name", name)
         .put("food_name", name),
       imageUrl,
       definition,
-      "**" + name + "**: " + definition
+      buildFoodAnswerHtml(food, name, definition)
     );
+  }
+
+  private String buildFoodAnswerHtml(JsonObject food, String name, String definition) {
+    String safeName = escapeHtml(name);
+    String safeDef = escapeHtml(definition);
+
+    StringBuilder answer = new StringBuilder();
+    answer.append("<b>").append(safeName).append("</b><br>").append(safeDef);
+
+    if (food == null) return answer.toString();
+
+    Double portionAmount = food.getDouble("portion_amount");
+    String portionUnit = food.getString("portion_unit", "");
+    Integer calories = food.getInteger("calories");
+    Double protein = food.getDouble("protein_g");
+    Double carbs = food.getDouble("carbs_g");
+    Double fat = food.getDouble("fat_g");
+    Double fiber = food.getDouble("fiber_g");
+    Double sugar = food.getDouble("sugar_g");
+    Double sodium = food.getDouble("sodium_mg");
+    Double cholesterol = food.getDouble("cholesterol_mg");
+    Integer glycemic = food.getInteger("glycemic_index");
+
+    boolean hasAnyMacro =
+      calories != null
+        || protein != null
+        || carbs != null
+        || fat != null
+        || fiber != null
+        || sugar != null
+        || sodium != null
+        || cholesterol != null
+        || glycemic != null;
+
+    if (hasAnyMacro) {
+      answer.append("<br><br><b>Nutrition</b>");
+      if (portionAmount != null) {
+        answer.append(" (per ").append(escapeHtml(trimDouble(portionAmount)));
+        if (portionUnit != null && !portionUnit.isBlank()) {
+          answer.append(" ").append(escapeHtml(portionUnit));
+        }
+        answer.append(")");
+      }
+      answer.append(":<ul>");
+
+      if (calories != null && calories > 0) answer.append("<li>Calories: ").append(calories).append(" kcal</li>");
+      if (protein != null && protein > 0) answer.append("<li>Protein: ").append(escapeHtml(trimDouble(protein))).append(" g</li>");
+      if (carbs != null && carbs > 0) answer.append("<li>Carbs: ").append(escapeHtml(trimDouble(carbs))).append(" g</li>");
+      if (fat != null && fat > 0) answer.append("<li>Fat: ").append(escapeHtml(trimDouble(fat))).append(" g</li>");
+      if (fiber != null && fiber > 0) answer.append("<li>Fiber: ").append(escapeHtml(trimDouble(fiber))).append(" g</li>");
+      if (sugar != null && sugar > 0) answer.append("<li>Sugar: ").append(escapeHtml(trimDouble(sugar))).append(" g</li>");
+      if (sodium != null && sodium > 0) answer.append("<li>Sodium: ").append(escapeHtml(trimDouble(sodium))).append(" mg</li>");
+      if (cholesterol != null && cholesterol > 0) answer.append("<li>Cholesterol: ").append(escapeHtml(trimDouble(cholesterol))).append(" mg</li>");
+      if (glycemic != null && glycemic > 0) answer.append("<li>Glycemic index: ").append(glycemic).append("</li>");
+
+      answer.append("</ul>");
+    }
+
+    JsonObject vitamins = food.getJsonObject("vitamins", new JsonObject());
+    if (vitamins != null && !vitamins.isEmpty()) {
+      List<String> keys = vitamins.fieldNames().stream().sorted().toList();
+      boolean started = false;
+      StringBuilder items = new StringBuilder();
+      int added = 0;
+      for (String key : keys) {
+        if (added >= 8) break;
+        Object raw = vitamins.getValue(key);
+        String value = raw == null ? "" : raw.toString().trim();
+        if (value.isBlank()) continue;
+        if (!started) {
+          started = true;
+          items.append("<br><b>Vitamins</b>:<ul>");
+        }
+        items.append("<li>").append(escapeHtml(prettyVitaminKey(key))).append(": ").append(escapeHtml(value)).append("</li>");
+        added++;
+      }
+      if (started) {
+        items.append("</ul>");
+        answer.append(items);
+      }
+    }
+
+    return answer.toString();
   }
 
   private String generateShortDefinition(JsonObject food, String name) {
@@ -178,7 +675,7 @@ public class VitaminChatService {
       new JsonObject().put("name", name).put("food_name", name),
       FALLBACK_IMAGE_URL,
       definition,
-      "**" + name + "**: " + definition
+      "<b>" + escapeHtml(name) + "</b><br>" + escapeHtml(definition)
     );
   }
 
@@ -310,6 +807,12 @@ public class VitaminChatService {
     String cleaned = q.toLowerCase().replaceAll("[^a-z\\s]", " ").replaceAll("\\s+", " ").trim();
     if (cleaned.isEmpty()) return "";
 
+    // Cooking queries: extract the food name so DB lookup works (DB-first).
+    if (isCookingQuestion(cleaned)) {
+      String cooking = extractCookingQuery(cleaned);
+      if (!cooking.isEmpty()) return cooking;
+    }
+
     // If user just typed a food name (1-4 words), treat it as a direct query.
     String[] words = cleaned.split(" ");
     if (words.length >= 1 && words.length <= 4 && !isGreeting(cleaned) && !containsFoodStopWords(words)) {
@@ -321,9 +824,19 @@ public class VitaminChatService {
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "what is ");
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "what are ");
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "define ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "explain ");
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "vitamins in ");
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "benefits of ");
     if (extracted.isEmpty()) extracted = extractAfter(cleaned, "nutrition of ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "nutrition facts for ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "nutrition facts of ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "calories in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "protein in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "carbs in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "fat in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "macros in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how many calories in ");
+    if (extracted.isEmpty()) extracted = extractAfter(cleaned, "how much protein in ");
 
     extracted = extracted.trim();
     extracted = extracted.replaceAll("^(a|an|the)\\s+", "");
@@ -354,10 +867,18 @@ public class VitaminChatService {
         || w.equals("are")
         || w.equals("this")
         || w.equals("that")
+        || w.equals("how")
+        || w.equals("to")
         || w.equals("tell")
         || w.equals("me")
         || w.equals("about")
+        || w.equals("explain")
         || w.equals("define")
+        || w.equals("cook")
+        || w.equals("cooking")
+        || w.equals("recipe")
+        || w.equals("make")
+        || w.equals("prepare")
         || w.equals("vitamins")
         || w.equals("vitamin")
         || w.equals("in")
