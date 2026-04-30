@@ -8,6 +8,9 @@ export interface AdminFoodItem {
   id: number;
   food_name: string;
   meal_type: string;
+  food_role?: 'main' | 'side' | string | null;
+  item_type?: 'food' | 'meal' | string | null;
+  components_json?: unknown[] | null;
   portion_amount: number;
   portion_unit: string;
   calories: number;

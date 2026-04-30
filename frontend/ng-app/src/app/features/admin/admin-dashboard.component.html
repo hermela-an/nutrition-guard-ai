@@ -61,6 +61,12 @@
           <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
         </select>
       </label>
+      <label>
+        <span class="label">Food role</span>
+        <select class="input" [(ngModel)]="form.food_role">
+          <option *ngFor="let r of foodRoles" [value]="r">{{ r }}</option>
+        </select>
+      </label>
 
       <label>
         <span class="label">Traffic light</span>
@@ -203,6 +209,7 @@
             <th>ID</th>
             <th>Food</th>
             <th>Meal</th>
+            <th>Type</th>
             <th>Traffic light</th>
             <th>Calories</th>
             <th>Macros</th>
@@ -228,6 +235,7 @@
               </div>
             </td>
             <td>{{ f.meal_type }}</td>
+            <td class="muted small">{{ foodRoleLabel(f) }}</td>
             <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
             <td>{{ f.calories | number:'1.0-0' }}</td>
             <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>

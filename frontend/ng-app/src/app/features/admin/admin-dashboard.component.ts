@@ -45,6 +45,7 @@ export class AdminDashboardComponent {
   vitaminRows: Array<{ label: string; value: string }> = [{ label: '', value: '' }];
 
   readonly trafficLights: TrafficLight[] = ['SAFE', 'CAUTION', 'AVOID'];
+  readonly foodRoles = ['main', 'side'] as const;
   readonly mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
   readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Carbohydrates', 'Protein', 'Dairy', 'Nuts and Seeds'];
   readonly healthEffectKeys = [
@@ -133,6 +134,7 @@ export class AdminDashboardComponent {
       food_name: item.food_name,
       category: item.category ?? 'Vegetables',
       meal_type: item.meal_type,
+      food_role: (item as any).food_role ?? ((item.meal_type ?? '').toLowerCase() === 'side' ? 'side' : 'main'),
       portion_amount: item.portion_amount,
       portion_unit: item.portion_unit,
       calories: item.calories,
@@ -283,10 +285,21 @@ export class AdminDashboardComponent {
     return item.id;
   }
 
+  foodRoleLabel(item: AdminFoodItem | null | undefined): 'main' | 'side' {
+    if (!item) return 'main';
+    const explicit = ((item as any).food_role ?? '').toString().trim().toLowerCase();
+    if (explicit === 'side') return 'side';
+    if (explicit === 'main') return 'main';
+
+    const mt = (item.meal_type ?? '').toString().trim().toLowerCase();
+    return mt === 'side' ? 'side' : 'main';
+  }
+
   private emptyForm(): Partial<AdminFoodItem> {
     return {
       food_name: '',
       meal_type: 'breakfast',
+      food_role: 'main',
       portion_amount: 1,
       portion_unit: 'serving',
       calories: 0,
@@ -346,11 +359,14 @@ export class AdminDashboardComponent {
     const portionAmount = Math.max(0, num(form.portion_amount));
     const calories = Math.max(0, Math.round(num(form.calories)));
     const glycemicIndex = Math.max(0, Math.round(num((form as any).glycemic_index)));
+    const foodRole = text((form as any).food_role || 'main').toLowerCase() || 'main';
+    const normalizedFoodRole = foodRole === 'side' ? 'side' : 'main';
 
     return {
       food_name: text(form.food_name),
       category: text(form.category) || null,
       meal_type: text(form.meal_type).toLowerCase(),
+      food_role: normalizedFoodRole,
       portion_amount: portionAmount,
       // Back-compat with DB column naming in this repo.
       // Backend will prefer portion_value / calories_kcal when present.

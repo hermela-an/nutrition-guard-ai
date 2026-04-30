@@ -298,6 +298,30 @@ Invoke-Psql -cfg $targetCfg -sql "CREATE TABLE IF NOT EXISTS $backupSchema.users
 Invoke-Psql -cfg $targetCfg -sql "CREATE TABLE IF NOT EXISTS $backupSchema.profiles AS TABLE public.profiles;" | Out-Null
 Invoke-Psql -cfg $targetCfg -sql "CREATE TABLE IF NOT EXISTS $backupSchema.food_items AS TABLE public.food_items;" | Out-Null
 
+# Ensure `public.food_items` has the columns used by the Admin Dashboard + meal composition features.
+# This is additive only (never drops/recreates the table).
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS category TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS portion_amount DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS portion_unit TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS calories_kcal NUMERIC;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS protein_g DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS carbs_g DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS fat_g DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS sugar_g DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS sodium_mg DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS cholesterol_mg DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS fiber_g DOUBLE PRECISION;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS glycemic_index INT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS ingredients TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(2048);" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS definition TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS health_effect TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS vitamins JSONB;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS traffic_light TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS item_type TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS food_role TEXT;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS components_json JSONB;" | Out-Null
+
 # Staging schema inside the TARGET DB.
 $stagingSchema = "_ng_sync"
 Write-Host "Preparing staging schema: $stagingSchema"
@@ -392,9 +416,75 @@ Invoke-Psql -cfg $targetCfg -sql $mergeProfilesSql | Out-Null
 
 Write-Host "Merging food items (including images/definitions)..."
 $mergeFoodsSql = @"
+-- Incremental mirror sync (no drop/recreate of public.food_items).
+-- Operations: UPDATE (by id), fallback UPDATE (by food_name+meal_type), INSERT (missing), DELETE (removed from source).
+BEGIN;
+
+-- 1) Primary UPDATE: same id exists in both DBs -> overwrite target with source values.
+UPDATE public.food_items t
+SET
+  food_name = s.food_name,
+  meal_type = s.meal_type,
+  food_role = s.food_role,
+  category = s.category,
+  traffic_light = s.traffic_light,
+  portion_amount = s.portion_amount,
+  portion_unit = s.portion_unit,
+  calories_kcal = s.calories_kcal,
+  protein_g = s.protein_g,
+  carbs_g = s.carbs_g,
+  fat_g = s.fat_g,
+  sugar_g = s.sugar_g,
+  sodium_mg = s.sodium_mg,
+  cholesterol_mg = s.cholesterol_mg,
+  fiber_g = s.fiber_g,
+  glycemic_index = s.glycemic_index,
+  ingredients = s.ingredients,
+  image_url = s.image_url,
+  definition = s.definition,
+  health_effect = s.health_effect,
+  vitamins = s.vitamins,
+  item_type = s.item_type,
+  components_json = s.components_json
+FROM $stagingSchema.food_items s
+WHERE t.id = s.id;
+
+-- 2) Fallback UPDATE: if the id doesn't exist locally, match by (food_name, meal_type).
+-- This is a best-effort safety net for mismatched id sequences.
+UPDATE public.food_items t
+SET
+  category = s.category,
+  food_role = s.food_role,
+  traffic_light = s.traffic_light,
+  portion_amount = s.portion_amount,
+  portion_unit = s.portion_unit,
+  calories_kcal = s.calories_kcal,
+  protein_g = s.protein_g,
+  carbs_g = s.carbs_g,
+  fat_g = s.fat_g,
+  sugar_g = s.sugar_g,
+  sodium_mg = s.sodium_mg,
+  cholesterol_mg = s.cholesterol_mg,
+  fiber_g = s.fiber_g,
+  glycemic_index = s.glycemic_index,
+  ingredients = s.ingredients,
+  image_url = s.image_url,
+  definition = s.definition,
+  health_effect = s.health_effect,
+  vitamins = s.vitamins,
+  item_type = s.item_type,
+  components_json = s.components_json
+FROM $stagingSchema.food_items s
+WHERE t.food_name = s.food_name
+  AND t.meal_type = s.meal_type
+  AND NOT EXISTS (SELECT 1 FROM public.food_items x WHERE x.id = s.id);
+
+-- 3) INSERT: rows present in source but missing locally.
 INSERT INTO public.food_items (
+  id,
   food_name,
   meal_type,
+  food_role,
   category,
   traffic_light,
   portion_amount,
@@ -412,50 +502,46 @@ INSERT INTO public.food_items (
   image_url,
   definition,
   health_effect,
-  vitamins
+  vitamins,
+  item_type,
+  components_json
 )
 SELECT
-  food_name,
-  meal_type,
-  category,
-  traffic_light,
-  portion_amount,
-  portion_unit,
-  calories_kcal,
-  protein_g,
-  carbs_g,
-  fat_g,
-  sugar_g,
-  sodium_mg,
-  cholesterol_mg,
-  fiber_g,
-  glycemic_index,
-  ingredients,
-  image_url,
-  definition,
-  health_effect,
-  vitamins
-FROM $stagingSchema.food_items
-ON CONFLICT (food_name, meal_type) DO UPDATE
-SET
-  category = COALESCE(EXCLUDED.category, public.food_items.category),
-  traffic_light = COALESCE(EXCLUDED.traffic_light, public.food_items.traffic_light),
-  portion_amount = COALESCE(EXCLUDED.portion_amount, public.food_items.portion_amount),
-  portion_unit = COALESCE(EXCLUDED.portion_unit, public.food_items.portion_unit),
-  calories_kcal = COALESCE(EXCLUDED.calories_kcal, public.food_items.calories_kcal),
-  protein_g = COALESCE(EXCLUDED.protein_g, public.food_items.protein_g),
-  carbs_g = COALESCE(EXCLUDED.carbs_g, public.food_items.carbs_g),
-  fat_g = COALESCE(EXCLUDED.fat_g, public.food_items.fat_g),
-  sugar_g = COALESCE(EXCLUDED.sugar_g, public.food_items.sugar_g),
-  sodium_mg = COALESCE(EXCLUDED.sodium_mg, public.food_items.sodium_mg),
-  cholesterol_mg = COALESCE(EXCLUDED.cholesterol_mg, public.food_items.cholesterol_mg),
-  fiber_g = COALESCE(EXCLUDED.fiber_g, public.food_items.fiber_g),
-  glycemic_index = COALESCE(EXCLUDED.glycemic_index, public.food_items.glycemic_index),
-  ingredients = COALESCE(EXCLUDED.ingredients, public.food_items.ingredients),
-  image_url = COALESCE(EXCLUDED.image_url, public.food_items.image_url),
-  definition = COALESCE(EXCLUDED.definition, public.food_items.definition),
-  health_effect = COALESCE(EXCLUDED.health_effect, public.food_items.health_effect),
-  vitamins = COALESCE(EXCLUDED.vitamins, public.food_items.vitamins);
+  s.id,
+  s.food_name,
+  s.meal_type,
+  s.food_role,
+  s.category,
+  s.traffic_light,
+  s.portion_amount,
+  s.portion_unit,
+  s.calories_kcal,
+  s.protein_g,
+  s.carbs_g,
+  s.fat_g,
+  s.sugar_g,
+  s.sodium_mg,
+  s.cholesterol_mg,
+  s.fiber_g,
+  s.glycemic_index,
+  s.ingredients,
+  s.image_url,
+  s.definition,
+  s.health_effect,
+  s.vitamins,
+  s.item_type,
+  s.components_json
+FROM $stagingSchema.food_items s
+WHERE NOT EXISTS (SELECT 1 FROM public.food_items t WHERE t.id = s.id)
+  AND NOT EXISTS (SELECT 1 FROM public.food_items t WHERE t.food_name = s.food_name AND t.meal_type = s.meal_type);
+
+-- 4) DELETE: rows present locally but removed from source.
+-- Use id as the primary key, and (food_name, meal_type) only as a fallback retention check.
+DELETE FROM public.food_items t
+WHERE NOT EXISTS (SELECT 1 FROM $stagingSchema.food_items s WHERE s.id = t.id)
+  AND NOT EXISTS (SELECT 1 FROM $stagingSchema.food_items s WHERE s.food_name = t.food_name AND s.meal_type = t.meal_type);
+
+COMMIT;
 "@
 Invoke-Psql -cfg $targetCfg -sql $mergeFoodsSql | Out-Null
 

@@ -6,6 +6,9 @@ services:
       POSTGRES_DB: nutritionguard
       POSTGRES_USER: nutritionguard
       POSTGRES_PASSWORD: nutritionguard
+      # Seeds are opt-in to avoid auto-inserting large food lists into an existing dev DB.
+      # Set to "1" only when you intentionally want to load `database/seed/*.sql`.
+      NUTRITIONGUARD_RUN_SEEDS: "0"
     ports:
       - "5433:5432"
     volumes:

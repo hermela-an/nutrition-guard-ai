@@ -23,6 +23,12 @@ for f in /ng-init/migrations/*.sql; do
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f "$f"
 done
 
+if [ "${NUTRITIONGUARD_RUN_SEEDS:-}" != "1" ]; then
+  echo "Skipping seeds (set NUTRITIONGUARD_RUN_SEEDS=1 to enable)."
+  echo "NutritionGuard: init complete."
+  exit 0
+fi
+
 echo "Applying seeds..."
 if ! ls /ng-init/seed/*.sql >/dev/null 2>&1; then
   echo "No seed .sql files found under /ng-init/seed" >&2

@@ -1,6 +1,16 @@
 # Initializes the NutritionGuard schema in your local Postgres database.
 # Reads connection settings from .env.local and runs migrations into DB_SCHEMA (default: public).
 
+param(
+  # Seeds are opt-in to avoid inserting extra foods into an existing dev DB.
+  # Use -RunSeeds when you intentionally want to load `database/seed/*.sql`.
+  [switch]$RunSeeds,
+  # Legacy/compat flag (still supported): -SkipSeeds forces seeds off.
+  [switch]$SkipSeeds,
+  # Convenience option for a small hardcoded keep-list.
+  [switch]$PruneKeepList
+)
+
 $envFile = Join-Path $PSScriptRoot ".env.local"
 
 if (!(Test-Path $envFile)) {
@@ -47,6 +57,7 @@ if ($migrations.Count -eq 0) {
 
 $seed1 = Join-Path $PSScriptRoot "..\\database\\seed\\001_food_items.sql"
 $seed2 = Join-Path $PSScriptRoot "..\\database\\seed\\002_import_food_items_from_json.sql"
+$pruneKeepListSql = Join-Path $PSScriptRoot "..\\database\\maintenance\\prune_food_items_keep_list.sql"
 
 # We use psql ON_ERROR_STOP so failures are obvious.
 $env:PGPASSWORD = $dbPassword
@@ -59,18 +70,44 @@ foreach ($m in $migrations) {
   psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $m.FullName
 }
 
-if (Test-Path $seed1) {
+Write-Host ""
+Write-Host "Verifying expected columns on public.food_items..."
+$verifySql = @"
+SELECT
+  column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'food_items'
+  AND column_name IN ('food_role', 'item_type')
+ORDER BY column_name;
+"@
+psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -c $verifySql
+
+if ($SkipSeeds -or (-not $RunSeeds)) {
+  Write-Host ""
+  Write-Host "Skipping seed scripts (seeds are opt-in). Existing public.food_items rows are preserved."
+} elseif (Test-Path $seed1) {
   Write-Host "Applying seed: 001_food_items.sql (idempotent)..."
   psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed1
 } else {
   Write-Host "Seed file not found (skipping): $seed1"
 }
 
-if (Test-Path $seed2) {
+if (-not $SkipSeeds -and $RunSeeds -and (Test-Path $seed2)) {
   Write-Host "Applying seed: 002_import_food_items_from_json.sql (idempotent)..."
   psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $seed2
-} else {
+} elseif (-not $SkipSeeds -and $RunSeeds) {
   Write-Host "Seed file not found (skipping): $seed2"
+}
+
+if ($PruneKeepList) {
+  if (!(Test-Path $pruneKeepListSql)) {
+    Write-Error "Missing prune keep-list script: $pruneKeepListSql"
+    exit 1
+  }
+  Write-Host ""
+  Write-Host "Pruning public.food_items to the keep-list (PruneKeepList=true)..."
+  psql -v ON_ERROR_STOP=1 -h $dbHost -p $dbPort -U $dbUser -d $dbName -f $pruneKeepListSql
 }
 
 Write-Host ""

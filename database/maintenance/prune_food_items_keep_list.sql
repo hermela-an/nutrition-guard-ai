@@ -68,7 +68,7 @@ BEGIN
       RAISE NOTICE 'Keep-list item not found: "%". Candidate existing names (up to 20): %', m, COALESCE(candidates, ARRAY[]::text[]);
     END LOOP;
 
-    -- RAISE EXCEPTION 'Refusing to prune public.food_items; keep-list foods not found: %', missing;
+    RAISE EXCEPTION 'Refusing to prune public.food_items; keep-list foods not found: %', missing;
   END IF;
 END $$;
 
