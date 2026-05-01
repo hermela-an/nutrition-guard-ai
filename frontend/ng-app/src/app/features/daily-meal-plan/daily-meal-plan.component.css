@@ -323,4 +323,59 @@
         gap: 4px;
       }
     }
+
+    .sides-section {
+      margin-top: 10px;
+      margin-left: 10px;
+      padding: 10px;
+      background: #f9fbf8;
+      border-left: 3px solid var(--brand);
+      border-radius: 0 8px 8px 0;
+      width: 100%;
+    }
+
+    .sides-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #7a8a7c;
+      margin-bottom: 6px;
+    }
+
+    .sides-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .side-item {
+      padding: 2px 0;
+    }
+
+    .side-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .side-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .side-meta {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    /* Ensure list items can expand for sides */
+    .meal-items li {
+      flex-wrap: wrap;
+    }
+
   

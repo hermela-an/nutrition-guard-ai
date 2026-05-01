@@ -61,4 +61,8 @@ export class AdminFoodsService {
   delete(id: number): Observable<{ deleted: number }> {
     return this.api.delete<{ deleted: number }>(`/api/admin/foods/${id}`, this.auth.authHeaders());
   }
+
+  sync(): Observable<{ message: string; synced_count: number }> {
+    return this.api.post<{ message: string; synced_count: number }>(`/api/admin/foods/sync`, {}, this.auth.authHeaders());
+  }
 }

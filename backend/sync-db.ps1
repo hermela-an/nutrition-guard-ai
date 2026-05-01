@@ -321,6 +321,8 @@ Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NO
 Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS item_type TEXT;" | Out-Null
 Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS food_role TEXT;" | Out-Null
 Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS components_json JSONB;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS needs_sync BOOLEAN NOT NULL DEFAULT true;" | Out-Null
+Invoke-Psql -cfg $targetCfg -sql "ALTER TABLE public.food_items ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;" | Out-Null
 
 # Staging schema inside the TARGET DB.
 $stagingSchema = "_ng_sync"

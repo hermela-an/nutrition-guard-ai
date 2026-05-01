@@ -18,6 +18,7 @@ interface MealItem {
   calories: number;
   traffic_light?: string;
   eaten?: boolean;
+  sides?: MealItem[];
 }
 
 interface MealBlock {
@@ -149,7 +150,12 @@ export class DailyMealPlanComponent {
       calories: Number(item.calories ?? 0),
       traffic_light: item.traffic_light,
       eaten: !!item.eaten,
-      meal_type: mealType
+      meal_type: mealType,
+      sides: item.sides ? item.sides.map(s => ({
+        ...s,
+        portion: s.portion ?? this.formatPortion(s),
+        calories: Number(s.calories ?? 0)
+      })) : undefined
     }));
 
     const targetCalories = normalized.reduce((sum, item) => sum + item.calories, 0);

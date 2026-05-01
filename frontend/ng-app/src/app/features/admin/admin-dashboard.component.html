@@ -1,4 +1,4 @@
-﻿<div class="page-header">
+<div class="page-header">
   <div>
     <div class="eyebrow">Admin</div>
     <h2>Food Management</h2>
@@ -7,6 +7,7 @@
   <div class="actions">
     <a class="btn ghost" routerLink="/dashboard">Open user app</a>
     <button type="button" class="btn ghost" (click)="refresh(true)">Refresh</button>
+    <button type="button" class="btn ghost" (click)="syncDatabase()">Sync Database</button>
     <button type="button" class="btn primary" (click)="startCreate()">Add food</button>
   </div>
 </div>

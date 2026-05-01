@@ -61,7 +61,7 @@ export class AdminDashboardComponent {
     { key: 'weight_gain', label: 'Weight Gain' }
   ] as const;
   readonly healthEffectOptions = [
-    { value: '', label: '—' },
+    { value: '', label: 'â€”' },
     { value: 'good', label: 'Good' },
     { value: 'neutral', label: 'Neutral' },
     { value: 'bad', label: 'Bad' }
@@ -274,6 +274,27 @@ export class AdminDashboardComponent {
       });
   }
 
+  syncDatabase(): void {
+    this.loading = true;
+    this.error = '';
+    this.foodsApi.sync().pipe(
+      timeout(15_000),
+      finalize(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (res) => {
+        this.toast.success(`Synced successfully: ${res.synced_count} items updated.`);
+      },
+      error: (err) => {
+        const msg = this.errorFrom(err, 'Sync failed.');
+        this.error = msg;
+        this.toast.error(msg);
+      }
+    });
+  }
+
   lightClass(light: string | null | undefined): 'safe' | 'caution' | 'avoid' {
     const normalized = (light ?? '').toString().toUpperCase();
     if (normalized === 'AVOID' || normalized === 'RED') return 'avoid';
@@ -402,11 +423,11 @@ export class AdminDashboardComponent {
 
   vitaminsPreview(raw: Record<string, unknown> | null | undefined): string {
     const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
-    if (!obj) return '—';
+    if (!obj) return 'â€”';
     const pairs = Object.entries(obj)
       .map(([k, v]) => [k, (v ?? '').toString().trim()] as const)
       .filter(([k, v]) => k.trim() && v);
-    if (!pairs.length) return '—';
+    if (!pairs.length) return 'â€”';
     return pairs
       .slice(0, 3)
       .map(([k, v]) => `${k}: ${v}`)
@@ -415,8 +436,8 @@ export class AdminDashboardComponent {
 
   ingredientsPreview(raw: string | null | undefined): string {
     const s = (raw ?? '').toString().trim();
-    if (!s) return '—';
-    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+    if (!s) return 'â€”';
+    return s.length > 60 ? `${s.slice(0, 60)}â€¦` : s;
   }
 
   private vitaminRowsFrom(raw: Record<string, unknown> | null | undefined): Array<{ label: string; value: string }> {
@@ -461,3 +482,4 @@ export class AdminDashboardComponent {
     }, 0);
   }
 }
+
