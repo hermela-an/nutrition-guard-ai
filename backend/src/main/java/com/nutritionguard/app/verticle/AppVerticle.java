@@ -119,6 +119,7 @@ public class AppVerticle extends AbstractVerticle {
 
     AuthMiddleware auth = new AuthMiddleware(new JwtService(vertx, config), config.adminEmails());
     AdminMiddleware admin = new AdminMiddleware();
+
     router.route("/api/admin*").handler(auth::handle);
     router.route("/api/admin*").handler(admin::handle);
     router.route("/api/auth/me").handler(auth::handle);
@@ -137,15 +138,17 @@ public class AppVerticle extends AbstractVerticle {
         .put("role", ctx.get("role"))
         .encode()));
 
-    new ProfileController(profileService, notificationService).mount(router);
-    new MealPlanController(vertx, profileService, notificationService, mealTrackingRepository).mount(router);
-    new FoodSearchController(foodSearchService, profileService, notificationService, searchEvents).mount(router);
-    new FoodsController(foodRepository, profileService).mount(router);
+    // Mount Admin controllers
     com.nutritionguard.app.service.FoodImportService foodImportService = new com.nutritionguard.app.service.FoodImportService(foodRepository);
     new AdminFoodController(foodRepository, foodImportService).mount(router);
     new AdminUsersController(userRepository).mount(router);
     new AdminStatsController(foodRepository, userRepository).mount(router);
     new AdminAnalyticsController(searchEvents).mount(router);
+    
+    new ProfileController(profileService, notificationService).mount(router);
+    new MealPlanController(vertx, profileService, notificationService, mealTrackingRepository).mount(router);
+    new FoodSearchController(foodSearchService, profileService, notificationService, searchEvents).mount(router);
+    new FoodsController(foodRepository, profileService).mount(router);
     new ProgressController(progressService).mount(router);
     new ChatController(vertx, profileService, foodSearchService, notificationService).mount(router);
     new NotificationController(notificationService).mount(router);

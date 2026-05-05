@@ -14,6 +14,36 @@ public class AdminFoodController {
   }
 
   public void mount(Router router) {
+    router.post("/api/admin/foods-import").handler(ctx -> {
+      try {
+        Object body = ctx.body() == null ? null : ctx.body().asJsonArray();
+        if (body == null) {
+          // Try as object if array fails
+          JsonObject obj = ctx.body() == null ? null : ctx.body().asJsonObject();
+          if (obj != null) {
+            body = new io.vertx.core.json.JsonArray().add(obj);
+          }
+        }
+
+        if (body == null) {
+          ctx.fail(400, new RuntimeException("Invalid JSON body: expected array of foods or a single food object"));
+          return;
+        }
+
+        importService.importBatch((io.vertx.core.json.JsonArray) body)
+          .onSuccess(results -> ctx.response()
+            .putHeader("Content-Type", "application/json")
+            .end(new JsonObject()
+              .put("message", "Successfully imported " + results.size() + " items")
+              .put("count", results.size())
+              .put("items", results)
+              .encode()))
+          .onFailure(err -> ctx.fail(400, err));
+      } catch (Throwable t) {
+        ctx.fail(t);
+      }
+    });
+
     router.get("/api/admin/foods").handler(ctx -> {
       try {
         String q = ctx.request().getParam("q");
@@ -46,35 +76,6 @@ public class AdminFoodController {
       }
     });
 
-    router.post("/api/admin/foods/import").handler(ctx -> {
-      try {
-        Object body = ctx.body() == null ? null : ctx.body().asJsonArray();
-        if (body == null) {
-          // Try as object if array fails
-          JsonObject obj = ctx.body() == null ? null : ctx.body().asJsonObject();
-          if (obj != null) {
-            body = new io.vertx.core.json.JsonArray().add(obj);
-          }
-        }
-
-        if (body == null) {
-          ctx.fail(400, new RuntimeException("Invalid JSON body: expected array of foods or a single food object"));
-          return;
-        }
-
-        importService.importBatch((io.vertx.core.json.JsonArray) body)
-          .onSuccess(results -> ctx.response()
-            .putHeader("Content-Type", "application/json")
-            .end(new JsonObject()
-              .put("message", "Successfully imported " + results.size() + " items")
-              .put("count", results.size())
-              .put("items", results)
-              .encode()))
-          .onFailure(err -> ctx.fail(400, err));
-      } catch (Throwable t) {
-        ctx.fail(t);
-      }
-    });
 
     router.put("/api/admin/foods/:id").handler(ctx -> {
       try {

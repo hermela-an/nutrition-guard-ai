@@ -24,9 +24,28 @@ public class FoodImportService {
       return Future.succeededFuture(new JsonArray());
     }
 
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < batch.size(); i++) {
-      Object item = batch.getValue(i);
+    List<Future<JsonObject>> futures = new ArrayList<>();
+    collectUpserts(batch, futures);
+
+    if (futures.isEmpty()) {
+      return Future.succeededFuture(new JsonArray());
+    }
+
+    return CompositeFuture.join(new ArrayList<>(futures)).map(cf -> {
+      JsonArray results = new JsonArray();
+      for (int i = 0; i < cf.size(); i++) {
+        JsonObject res = cf.resultAt(i);
+        if (res != null) {
+          results.add(res);
+        }
+      }
+      return results;
+    });
+  }
+
+  private void collectUpserts(JsonArray array, List<Future<JsonObject>> futures) {
+    for (int i = 0; i < array.size(); i++) {
+      Object item = array.getValue(i);
       if (item instanceof JsonObject) {
         JsonObject normalized = normalize((JsonObject) item);
         
@@ -35,20 +54,16 @@ public class FoodImportService {
             normalized.getString("category", "").isBlank() ||
             normalized.getString("item_type", "").isBlank() ||
             normalized.getInteger("calories_kcal") == null) {
-          return Future.failedFuture("Some foods are missing required fields (food_name, category, item_type, or calories_kcal)");
+          // We could skip invalid items or fail the whole batch. 
+          // For now, let's just skip them to be more resilient, or we can add a failed future.
+          continue;
         }
         
         futures.add(foods.upsert(normalized));
+      } else if (item instanceof JsonArray) {
+        collectUpserts((JsonArray) item, futures);
       }
     }
-
-    return CompositeFuture.join(futures).map(cf -> {
-      JsonArray results = new JsonArray();
-      for (int i = 0; i < cf.size(); i++) {
-        results.add(cf.resultAt(i));
-      }
-      return results;
-    });
   }
 
   /**
@@ -59,8 +74,8 @@ public class FoodImportService {
     JsonObject clean = new JsonObject();
 
     // Basic Identification
-    clean.put("food_name", findString(raw, "food_name", "name", "title", "label", "item_name"));
-    clean.put("category", findString(raw, "Vegetables", "category", "group", "food_group", "type_category"));
+    clean.put("food_name", findString(raw, "Unnamed Imported Food", "food_name", "name", "title", "label", "item_name"));
+    clean.put("category", findString(raw, "Vegetables", "category", "food_category", "group", "food_group", "type_category"));
     clean.put("meal_type", findString(raw, "custom", "meal_type", "meal", "occasion", "category_meal"));
     clean.put("food_role", findString(raw, "main", "food_role", "role", "item_role", "side_or_main"));
 
@@ -71,7 +86,7 @@ public class FoodImportService {
     // Nutritional Facts (Mapping variations to database schema)
     clean.put("calories_kcal", findInt(raw, 0, "calories_kcal", "calories", "energy", "energy_kcal", "kcal"));
     clean.put("protein_g", findDouble(raw, 0.0, "protein_g", "protein", "proteins", "protein_content"));
-    clean.put("carbs_g", findDouble(raw, 0.0, "carbs_g", "carbs", "carbohydrates", "carbohydrate_g", "total_carbs"));
+    clean.put("carbs_g", findDouble(raw, 0.0, "carbs_g", "carbohydrates", "carbohydrate_g", "total_carbs", "carbs"));
     clean.put("fat_g", findDouble(raw, 0.0, "fat_g", "fat", "fats", "lipid_g", "total_fat"));
     clean.put("fiber_g", findDouble(raw, 0.0, "fiber_g", "fiber", "dietary_fiber", "fiber_content"));
     clean.put("sugar_g", findDouble(raw, 0.0, "sugar_g", "sugar", "sugars", "total_sugars", "sucrose_g"));
