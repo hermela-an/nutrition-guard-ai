@@ -350,6 +350,25 @@ public class FoodRepository {
       .map(this::rowsToFoods);
   }
 
+  public Future<JsonObject> upsert(JsonObject input) {
+    String name = input == null ? "" : input.getString("food_name", "");
+    String mealType = input == null ? "" : input.getString("meal_type", "");
+
+    if (name.isBlank()) {
+      return Future.failedFuture("food_name is required for upsert");
+    }
+
+    String sql = "SELECT id FROM food_items WHERE LOWER(food_name) = LOWER($1) AND LOWER(meal_type) = LOWER($2) AND is_deleted = false LIMIT 1";
+    return db.query(sql, Tuple.of(name, mealType)).compose(rows -> {
+      if (rows.iterator().hasNext()) {
+        int id = rows.iterator().next().getInteger("id");
+        return update(id, input);
+      } else {
+        return create(input);
+      }
+    });
+  }
+
   public Future<JsonObject> create(JsonObject input) {
     JsonObject safe = input == null ? new JsonObject() : input;
     double portionValue = doubleFrom(safe, "portion_value", doubleFrom(safe, "portion_amount", 1.0));
@@ -359,6 +378,7 @@ public class FoodRepository {
 
     String sql = """
       INSERT INTO food_items (
+        id,
         food_name,
         category,
         meal_type,
@@ -383,7 +403,7 @@ public class FoodRepository {
         item_type,
         components_json
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18::jsonb,$19,$20,$21,$22,$23::jsonb)
+      VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM food_items), $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18::jsonb,$19,$20,$21,$22,$23::jsonb)
       RETURNING
         id,
         traffic_light,
@@ -1029,4 +1049,15 @@ public class FoodRepository {
     String sql = "UPDATE food_items SET needs_sync = false WHERE needs_sync = true";
     return db.query(sql, Tuple.tuple()).map(rows -> rows.rowCount());
   }
+
+  public io.vertx.core.Future<Void> renumber() {
+    return db.pool().withTransaction(conn ->
+      conn.query("DELETE FROM food_items WHERE is_deleted = true").execute()
+        .compose(v -> conn.query("UPDATE food_items SET id = -id").execute())
+        .compose(v -> conn.query("UPDATE food_items f SET id = m.new_id FROM (SELECT id, row_number() OVER (ORDER BY -id ASC) as new_id FROM food_items) m WHERE f.id = m.id").execute())
+        .compose(v -> conn.query("SELECT setval('food_items_id_seq', (SELECT COALESCE(MAX(id), 0) FROM food_items), true)").execute())
+        .mapEmpty()
+    );
+  }
 }
+

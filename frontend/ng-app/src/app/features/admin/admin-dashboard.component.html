@@ -8,6 +8,8 @@
     <a class="btn ghost" routerLink="/dashboard">Open user app</a>
     <button type="button" class="btn ghost" (click)="refresh(true)">Refresh</button>
     <button type="button" class="btn ghost" (click)="syncDatabase()">Sync Database</button>
+    <button type="button" class="btn ghost" (click)="jsonFile.click()">Import JSON</button>
+    <input #jsonFile type="file" accept=".json" style="display:none" (change)="importJson($event, jsonFile)" />
     <button type="button" class="btn primary" (click)="startCreate()">Add food</button>
   </div>
 </div>

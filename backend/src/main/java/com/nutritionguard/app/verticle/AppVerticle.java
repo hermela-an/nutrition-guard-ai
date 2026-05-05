@@ -141,7 +141,8 @@ public class AppVerticle extends AbstractVerticle {
     new MealPlanController(vertx, profileService, notificationService, mealTrackingRepository).mount(router);
     new FoodSearchController(foodSearchService, profileService, notificationService, searchEvents).mount(router);
     new FoodsController(foodRepository, profileService).mount(router);
-    new AdminFoodController(foodRepository).mount(router);
+    com.nutritionguard.app.service.FoodImportService foodImportService = new com.nutritionguard.app.service.FoodImportService(foodRepository);
+    new AdminFoodController(foodRepository, foodImportService).mount(router);
     new AdminUsersController(userRepository).mount(router);
     new AdminStatsController(foodRepository, userRepository).mount(router);
     new AdminAnalyticsController(searchEvents).mount(router);

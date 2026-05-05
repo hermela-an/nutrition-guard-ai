@@ -73,6 +73,7 @@ public class FoodItemRepository {
 
     String sql = """
       INSERT INTO public.food_items (
+        id,
         food_name,
         meal_type,
         portion_amount,
@@ -81,7 +82,7 @@ public class FoodItemRepository {
         item_type,
         components_json
       )
-      VALUES ($1, $2, $3, 'g', NULL, 'meal', $4::jsonb)
+      VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM food_items), $1, $2, $3, 'g', NULL, 'meal', $4::jsonb)
       RETURNING
         id,
         food_name,
@@ -275,3 +276,4 @@ public class FoodItemRepository {
     return total;
   }
 }
+

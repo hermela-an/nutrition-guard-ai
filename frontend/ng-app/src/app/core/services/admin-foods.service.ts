@@ -65,4 +65,8 @@ export class AdminFoodsService {
   sync(): Observable<{ message: string; synced_count: number }> {
     return this.api.post<{ message: string; synced_count: number }>(`/api/admin/foods/sync`, {}, this.auth.authHeaders());
   }
+
+  importFoods(data: any[]): Observable<{ message: string; count: number; items: AdminFoodItem[] }> {
+    return this.api.post<{ message: string; count: number; items: AdminFoodItem[] }>(`/api/admin/foods/import`, data, this.auth.authHeaders());
+  }
 }

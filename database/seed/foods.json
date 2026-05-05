@@ -1,54 +1,57 @@
 [
-
+[
   {
-  "food_name": "Misir Wat with Injera",
+    "food_name": "Instant Noodles",
 
-  "definition": "Misir Wat with Injera is a traditional Ethiopian meal made from spicy red lentil stew served with injera. It is a balanced dish rich in carbohydrates (~64.4 g), plant-based protein (~14.9 g), dietary fiber (~9.3 g), and healthy fats (~9.3 g), along with key minerals like iron and potassium. It provides steady energy, supports digestion, improves heart health, helps regulate blood sugar and cholesterol levels, and supports the prevention of anemia due to its iron content.",
+    "definition": "Instant noodles are pre-cooked and dried wheat noodles designed for quick preparation, usually sold with seasoning packets and commonly consumed as an affordable fast meal. They provide mainly quick energy from refined carbohydrates and added fats, but have limited overall micronutrient density compared to whole foods. A standard portion is 100 g of dry noodles, which provides approximately 520 kcal, along with around 52 g carbohydrates, 10.3 g protein, 31.7 g fat, 1.9 g fiber, and about 378 mg sodium. They are useful for fast energy and convenience, but should ideally be balanced with vegetables or protein sources to improve nutritional quality.",
 
-  "ingredients": "Misir Wat with Injera is a traditional Ethiopian meal served with injera and spicy red lentil stew. The misir wat is a spicy red lentil stew made by cooking red lentils with onions, garlic, tomatoes, and berbere spice, which gives it its rich heat and deep flavor. It is typically prepared with a small amount of vegetable oil and seasoned with salt, and sometimes enhanced with ginger or paprika depending on the recipe.",
+    "ingredients": "Instant noodles are typically made from refined wheat flour, water, and vegetable oil (often palm oil), along with salt and food additives for texture and preservation, and they are usually served with a seasoning packet containing salt, spices, flavor enhancers, and sometimes dehydrated vegetables or artificial flavors.",
+      
+     "food_category": "carbohydrate",
+     "food_role": "main",
+    "portion": {
+      "description": "Dry noodles portion",
+      "noodles": "100 g dry instant noodles",
+      "total_weight_g": 100
+    },
 
-  "portion": {
-    "description": "Served as a combined meal",
-    "injera": "1 medium injera (~100 g)",
-    "misir_wat": "1 cup lentil stew (~200 g)",
-    "total_weight_g": 300
-  },
+    "nutrition_per_serving": {
+      "calories_kcal": 520,
+      "protein_g": 10.3,
+      "carbs_g": 52,
+      "fat_g": 31.7,
+      "fiber_g": 1.9,
+      "sugar_g": 2,
+      "sodium_mg": 378,
+      "cholesterol_mg": 0,
+      "glycemic_index": 50
+    },
 
-  "nutrition_per_serving": {
-    "calories_kcal": 381,
-    "protein_g": 14.9,
-    "carbs_g": 64.4,
-    "fat_g": 9.3,
-    "fiber_g": 9.3,
-    "sugar_g": 6.5,
-    "sodium_mg": 1196,
-    "cholesterol_mg": 0,
-    "glycemic_index": 50
-  },
+    "vitamins_and_minerals": {
+      "iron_mg": 4,
+      "potassium_mg": 120,
+      "calcium_mg": 20,
+      "magnesium_mg": 25,
+      "folate_mcg": 60,
+      "vitamin_b1_mg": 0.3,
+      "vitamin_b2_mg": 0.15,
+      "vitamin_b3_mg": 3.5,
+      "vitamin_b6_mg": 0.2,
+      "folate_mg": 0.06
+    },
 
-  "vitamins_and_minerals": {
-    "iron_mg": 5.5,
-    "potassium_mg": 650,
-    "calcium_mg": 110,
-    "magnesium_mg": 90,
-    "folate_mcg": 180,
-    "vitamin_b1_mg": 0.25,
-    "vitamin_b2_mg": 0.18,
-    "vitamin_b3_mg": 2.5,
-    "vitamin_b6_mg": 0.35
-  },
-
-  "health_effects": {
-    "high_bp": "neutral",
-    "low_bp": "good",
-    "diabetes": "neutral",
-    "high_cholesterol": "good",
-    "anemia": "good",
-    "allergy": "neutral",
-    "heart_disease": "good",
-    "kidney_disease": "neutral",
-    "weight_loss": "good",
-    "weight_gain": "good"
+    "health_effects": {
+      "high_bp": "bad",
+      "low_bp": "good",
+      "diabetes": "neutral",
+      "high_cholesterol": "bad",
+      "anemia": "neutral",
+      "allergy": "neutral",
+      "heart_disease": "bad",
+      "kidney_disease": "bad",
+      "weight_loss": "neutral",
+      "weight_gain": "good"
+    }
   }
-}
+]
  ]

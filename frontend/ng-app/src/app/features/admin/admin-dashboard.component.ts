@@ -295,6 +295,57 @@ export class AdminDashboardComponent {
     });
   }
 
+  importJson(event: Event, input: HTMLInputElement): void {
+    const file = input.files && input.files.length > 0 ? input.files[0] : null;
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      this.toast.error('Invalid file format. Please select a .json file.');
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const content = reader.result as string;
+        const data = JSON.parse(content);
+        
+        // Ensure it's an array for the batch import
+        const payload = Array.isArray(data) ? data : [data];
+
+        this.loading = true;
+        this.error = '';
+        this.foodsApi.importFoods(payload).pipe(
+          timeout(20_000),
+          finalize(() => {
+            this.loading = false;
+            input.value = '';
+            this.cdr.detectChanges();
+          })
+        ).subscribe({
+          next: (res) => {
+            this.toast.success(res.message || `Successfully imported ${res.count} items.`);
+            this.refresh(true);
+          },
+          error: (err) => {
+            const msg = this.errorFrom(err, 'Import failed.');
+            this.error = msg;
+            this.toast.error(msg);
+          }
+        });
+      } catch (e) {
+        this.toast.error('Invalid JSON format.');
+        input.value = '';
+      }
+    };
+    reader.onerror = () => {
+      this.toast.error('Failed to read file.');
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
   lightClass(light: string | null | undefined): 'safe' | 'caution' | 'avoid' {
     const normalized = (light ?? '').toString().toUpperCase();
     if (normalized === 'AVOID' || normalized === 'RED') return 'avoid';
