@@ -29,19 +29,19 @@ public class RecommendedFoodsController {
           : profile.getJsonObject("health_metadata", new JsonObject()).copy().put("goal", profile.getString("goal", ""));
 
         return foodItems.listRecommendedBaseFoods(q, limit, offset)
-          .map(items -> applyTrafficLights(items, health));
+          .map(items -> applyTrafficLights(items, profile));
       })
         .onSuccess(items -> ctx.response().putHeader("Content-Type", "application/json").end(items.encode()))
         .onFailure(err -> ctx.response().setStatusCode(400).end(err.getMessage()));
     });
   }
 
-  private JsonArray applyTrafficLights(JsonArray items, JsonObject health) {
+  private JsonArray applyTrafficLights(JsonArray items, JsonObject profile) {
     if (items == null) return new JsonArray();
     for (int i = 0; i < items.size(); i++) {
       JsonObject item = items.getJsonObject(i);
       if (item == null) continue;
-      String light = TrafficLightUtil.evaluate(health, item);
+      String light = TrafficLightUtil.evaluateWithProfile(profile, item);
       item.put("traffic_light", light);
     }
     return items;

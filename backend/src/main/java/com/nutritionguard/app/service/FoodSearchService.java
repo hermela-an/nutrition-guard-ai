@@ -13,12 +13,12 @@ public class FoodSearchService {
     this.foodRepository = foodRepository;
   }
 
-  public Future<JsonArray> search(String query, JsonObject healthMetadata) {
+  public Future<JsonArray> search(String query, JsonObject profile) {
     return foodRepository.search(query).map(items -> {
       JsonArray enriched = new JsonArray();
       for (int i = 0; i < items.size(); i++) {
         JsonObject item = items.getJsonObject(i);
-        item.put("traffic_light", TrafficLightUtil.evaluate(healthMetadata, item));
+        item.put("traffic_light", TrafficLightUtil.evaluateWithProfile(profile, item));
         enriched.add(item);
       }
       return enriched;

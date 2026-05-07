@@ -46,68 +46,45 @@ public class FoodRepository {
 
   public Future<JsonArray> search(String query) {
     String sql = """
-      WITH normalized AS (
-        SELECT
-          id,
-          COALESCE(to_jsonb(food_items)->>'item_type', 'food') AS item_type,
-          COALESCE((to_jsonb(food_items)->>'is_recommended_base')::boolean, FALSE) AS is_recommended_base,
-          to_jsonb(food_items)->'components_json' AS components_json,
-          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
-            WHEN 'GREEN' THEN 'SAFE'
-            WHEN 'YELLOW' THEN 'CAUTION'
-            WHEN 'RED' THEN 'AVOID'
-            WHEN 'SAFE' THEN 'SAFE'
-            WHEN 'CAUTION' THEN 'CAUTION'
-            WHEN 'AVOID' THEN 'AVOID'
-            ELSE 'SAFE'
-          END AS traffic_light,
-          COALESCE(
-            to_jsonb(food_items)->>'food_name',
-            to_jsonb(food_items)->>'name'
-          ) AS food_name,
-          to_jsonb(food_items)->>'category' AS category,
-          COALESCE(
-            to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'short_description'
-          ) AS definition,
-          COALESCE(
-            to_jsonb(food_items)->>'image_url',
-            to_jsonb(food_items)->>'imageUrl',
-            to_jsonb(food_items)->>'image'
-          ) AS image_url,
-          to_jsonb(food_items)->>'meal_type' AS meal_type,
-          food_role,
-          COALESCE(
-            (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
-            (to_jsonb(food_items)->>'portion_value')::numeric::double precision
-          ) AS portion_amount,
-          to_jsonb(food_items)->>'portion_unit' AS portion_unit,
-          COALESCE(
-            (to_jsonb(food_items)->>'calories')::numeric::int,
-            (to_jsonb(food_items)->>'calories_kcal')::numeric::int,
-            0
-          ) AS calories_kcal,
-          COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
-          COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
-          COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
-          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
-          COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
-          COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
-          COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
-          to_jsonb(food_items)->>'ingredients' AS ingredients,
-          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
-        FROM food_items
-        WHERE COALESCE(to_jsonb(food_items)->>'item_type', 'food') IN ('food', 'meal') AND is_deleted = false
-      )
-      SELECT *
-      FROM normalized
-      WHERE LOWER(COALESCE(food_name, '')) LIKE LOWER($1)
-      ORDER BY food_name
-      LIMIT 50
+      SELECT
+        id,
+        COALESCE(item_type, 'food') AS item_type,
+        COALESCE(is_recommended_base, FALSE) AS is_recommended_base,
+        components_json,
+        CASE UPPER(COALESCE(traffic_light, ''))
+          WHEN 'GREEN' THEN 'SAFE'
+          WHEN 'YELLOW' THEN 'CAUTION'
+          WHEN 'RED' THEN 'AVOID'
+          WHEN 'SAFE' THEN 'SAFE'
+          WHEN 'CAUTION' THEN 'CAUTION'
+          WHEN 'AVOID' THEN 'AVOID'
+          ELSE 'SAFE'
+        END AS traffic_light,
+        food_name,
+        category,
+        definition,
+        image_url,
+        meal_type,
+        food_role,
+        (portion_amount)::double precision AS portion_amount,
+        portion_unit,
+        (calories_kcal)::numeric::int AS calories_kcal,
+        (protein_g)::double precision AS protein_g,
+        (carbs_g)::double precision AS carbs_g,
+        (fat_g)::double precision AS fat_g,
+        (fiber_g)::double precision AS fiber_g,
+        (sugar_g)::double precision AS sugar_g,
+        (sodium_mg)::double precision AS sodium_mg,
+        (cholesterol_mg)::double precision AS cholesterol_mg,
+        (glycemic_index)::numeric::int AS glycemic_index,
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        ingredients,
+        COALESCE(health_effect, '{}'::jsonb) AS health_effect
+      FROM food_items
+      WHERE (food_name ILIKE $1 OR category ILIKE $1 OR definition ILIKE $1) AND is_deleted = false
+      ORDER BY food_name ASC
+      LIMIT 100
       """;
-
     return db.query(sql, Tuple.of("%" + query + "%")).map(this::rowsToFoods);
   }
 
@@ -700,66 +677,46 @@ public class FoodRepository {
 
   public Future<JsonArray> mealCandidates(String mealType) {
     String sql = """
-      WITH normalized AS (
-        SELECT
-          id,
-          COALESCE(to_jsonb(food_items)->>'item_type', 'food') AS item_type,
-          COALESCE((to_jsonb(food_items)->>'is_recommended_base')::boolean, FALSE) AS is_recommended_base,
-          to_jsonb(food_items)->'components_json' AS components_json,
-          CASE UPPER(COALESCE(to_jsonb(food_items)->>'traffic_light', ''))
-            WHEN 'GREEN' THEN 'SAFE'
-            WHEN 'YELLOW' THEN 'CAUTION'
-            WHEN 'RED' THEN 'AVOID'
-            WHEN 'SAFE' THEN 'SAFE'
-            WHEN 'CAUTION' THEN 'CAUTION'
-            WHEN 'AVOID' THEN 'AVOID'
-            ELSE 'SAFE'
-          END AS traffic_light,
-          COALESCE(
-            to_jsonb(food_items)->>'food_name',
-            to_jsonb(food_items)->>'name'
-          ) AS food_name,
-          to_jsonb(food_items)->>'category' AS category,
-          COALESCE(
-            to_jsonb(food_items)->>'definition',
-            to_jsonb(food_items)->>'short_description'
-          ) AS definition,
-          COALESCE(
-            to_jsonb(food_items)->>'image_url',
-            to_jsonb(food_items)->>'imageUrl',
-            to_jsonb(food_items)->>'image'
-          ) AS image_url,
-          to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
-          COALESCE(
-            (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
-            (to_jsonb(food_items)->>'portion_value')::numeric::double precision
-          ) AS portion_amount,
-          to_jsonb(food_items)->>'portion_unit' AS portion_unit,
-          COALESCE(
-            (to_jsonb(food_items)->>'calories')::numeric::int,
-            (to_jsonb(food_items)->>'calories_kcal')::numeric::int,
-            0
-          ) AS calories_kcal,
-          COALESCE((to_jsonb(food_items)->>'protein_g')::numeric::double precision, 0) AS protein_g,
-          COALESCE((to_jsonb(food_items)->>'carbs_g')::numeric::double precision, 0) AS carbs_g,
-          COALESCE((to_jsonb(food_items)->>'fat_g')::numeric::double precision, 0) AS fat_g,
-          COALESCE((to_jsonb(food_items)->>'fiber_g')::numeric::double precision, 0) AS fiber_g,
-          COALESCE((to_jsonb(food_items)->>'sugar_g')::numeric::double precision, 0) AS sugar_g,
-          COALESCE((to_jsonb(food_items)->>'sodium_mg')::numeric::double precision, 0) AS sodium_mg,
-          COALESCE((to_jsonb(food_items)->>'cholesterol_mg')::numeric::double precision, 0) AS cholesterol_mg,
-          COALESCE((to_jsonb(food_items)->>'glycemic_index')::numeric::int, 0) AS glycemic_index,
-          COALESCE(to_jsonb(food_items)->'vitamins', '{}'::jsonb) AS vitamins,
-          to_jsonb(food_items)->>'ingredients' AS ingredients,
-          COALESCE(to_jsonb(food_items)->'health_effect', '{}'::jsonb) AS health_effect
-        FROM food_items
-        WHERE COALESCE(to_jsonb(food_items)->>'item_type', 'food') IN ('food', 'meal') AND is_deleted = false
-      )
-      SELECT *
-      FROM normalized
-      WHERE meal_type = $1 AND food_role NOT IN ('side', 'side_food')
+      SELECT
+        id,
+        COALESCE(item_type, 'food') AS item_type,
+        COALESCE(is_recommended_base, FALSE) AS is_recommended_base,
+        components_json,
+        CASE UPPER(COALESCE(traffic_light, ''))
+          WHEN 'GREEN' THEN 'SAFE'
+          WHEN 'YELLOW' THEN 'CAUTION'
+          WHEN 'RED' THEN 'AVOID'
+          WHEN 'SAFE' THEN 'SAFE'
+          WHEN 'CAUTION' THEN 'CAUTION'
+          WHEN 'AVOID' THEN 'AVOID'
+          ELSE 'SAFE'
+        END AS traffic_light,
+        food_name,
+        category,
+        definition,
+        image_url,
+        meal_type,
+        food_role,
+        (portion_amount)::double precision AS portion_amount,
+        portion_unit,
+        (calories_kcal)::numeric::int AS calories_kcal,
+        (protein_g)::double precision AS protein_g,
+        (carbs_g)::double precision AS carbs_g,
+        (fat_g)::double precision AS fat_g,
+        (fiber_g)::double precision AS fiber_g,
+        (sugar_g)::double precision AS sugar_g,
+        (sodium_mg)::double precision AS sodium_mg,
+        (cholesterol_mg)::double precision AS cholesterol_mg,
+        (glycemic_index)::numeric::int AS glycemic_index,
+        COALESCE(vitamins, '{}'::jsonb) AS vitamins,
+        ingredients,
+        COALESCE(health_effect, '{}'::jsonb) AS health_effect
+      FROM food_items
+      WHERE LOWER(meal_type) = LOWER($1) 
+        AND food_role NOT IN ('side', 'side_food')
+        AND is_deleted = false
       ORDER BY calories_kcal ASC
-      LIMIT 30
+      LIMIT 100
       """;
 
     return db.query(sql, Tuple.of(mealType)).map(this::rowsToFoods);

@@ -30,9 +30,7 @@ public class FoodSearchController {
         if (profile == null) {
           return io.vertx.core.Future.failedFuture("Profile not found");
         }
-        JsonObject health = profile.getJsonObject("health_metadata", new JsonObject()).copy();
-        health.put("goal", profile.getString("goal", ""));
-        return foodSearch.search(query == null ? "" : query, health);
+        return foodSearch.search(query == null ? "" : query, profile);
       }).onSuccess(result -> {
           maybeNotifySearch(userId, query, result);
           recordSearch(userId, query, result);

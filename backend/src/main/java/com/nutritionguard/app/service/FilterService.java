@@ -30,16 +30,16 @@ public class FilterService {
       JsonArray sides = cf.resultAt(4);
       JsonObject response = new JsonObject();
       response.put("goal", goal);
-      response.put("breakfast", processMeal(cf.resultAt(0), health, preferHighCalories, preferLowCalories, sides));
-      response.put("lunch", processMeal(cf.resultAt(1), health, preferHighCalories, preferLowCalories, sides));
-      response.put("dinner", processMeal(cf.resultAt(2), health, preferHighCalories, preferLowCalories, sides));
-      response.put("snacks", pickSafe(cf.resultAt(3), health, preferHighCalories, preferLowCalories));
+      response.put("breakfast", processMeal(cf.resultAt(0), profile, preferHighCalories, preferLowCalories, sides));
+      response.put("lunch", processMeal(cf.resultAt(1), profile, preferHighCalories, preferLowCalories, sides));
+      response.put("dinner", processMeal(cf.resultAt(2), profile, preferHighCalories, preferLowCalories, sides));
+      response.put("snacks", pickSafe(cf.resultAt(3), profile, preferHighCalories, preferLowCalories));
       return response;
     });
   }
 
-  private JsonArray processMeal(JsonArray candidates, JsonObject health, boolean preferHigh, boolean preferLow, JsonArray allSides) {
-    JsonArray selected = pickSafe(candidates, health, preferHigh, preferLow);
+  private JsonArray processMeal(JsonArray candidates, JsonObject profile, boolean preferHigh, boolean preferLow, JsonArray allSides) {
+    JsonArray selected = pickSafe(candidates, profile, preferHigh, preferLow);
     for (int i = 0; i < selected.size(); i++) {
       JsonObject food = selected.getJsonObject(i);
       if (needsSideFood(food)) {
@@ -54,8 +54,21 @@ public class FilterService {
     return "main".equals(role) || "main_food".equals(role);
   }
 
-  private JsonArray pickSafe(JsonArray input, JsonObject health, boolean preferHigh, boolean preferLow) {
-    JsonArray safe = new JsonArray();
+  private JsonArray pickSafe(JsonArray input, JsonObject profile, boolean preferHigh, boolean preferLow) {
+    JsonArray selected = new JsonArray();
+    
+    // Pass 1: Look for SAFE foods
+    findForLight(input, profile, "SAFE", selected, preferHigh, preferLow);
+    
+    // Pass 2: If we need more, look for CAUTION foods
+    if (selected.size() < 3) {
+      findForLight(input, profile, "CAUTION", selected, preferHigh, preferLow);
+    }
+    
+    return selected;
+  }
+
+  private void findForLight(JsonArray input, JsonObject profile, String targetLight, JsonArray results, boolean preferHigh, boolean preferLow) {
     int start = 0;
     int end = input.size() - 1;
     int step = 1;
@@ -67,16 +80,25 @@ public class FilterService {
     }
 
     for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
-      if (safe.size() >= 3) {
-        break;
-      }
+      if (results.size() >= 3) break;
+      
       JsonObject item = input.getJsonObject(i);
-      String light = TrafficLightUtil.evaluate(health, item);
-      if ("SAFE".equalsIgnoreCase(light)) {
+      // Skip if already added
+      if (containsId(results, item.getInteger("id"))) continue;
+
+      String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+      if (targetLight.equalsIgnoreCase(light)) {
         item.put("traffic_light", light);
-        safe.add(item);
+        results.add(item);
       }
     }
-    return safe;
+  }
+
+  private boolean containsId(JsonArray array, Integer id) {
+    if (id == null) return false;
+    for (int i = 0; i < array.size(); i++) {
+      if (id.equals(array.getJsonObject(i).getInteger("id"))) return true;
+    }
+    return false;
   }
 }
