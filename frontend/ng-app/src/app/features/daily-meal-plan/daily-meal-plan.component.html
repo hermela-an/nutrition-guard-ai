@@ -89,13 +89,20 @@
             </div>
             <!-- Side Food Section -->
             <div class="sides-section" *ngIf="item.sides && item.sides.length > 0">
-              <div class="sides-title">Side Food</div>
+              <div class="sides-title">Optional side food choices</div>
               <ul class="sides-list">
                 <li *ngFor="let side of item.sides" class="side-item">
-                  <div class="side-info">
-                    <span class="side-name">{{ side.food_name }}</span>
-                    <span class="side-meta">{{ side.portion }} — {{ side.calories }} cal</span>
-                  </div>
+                  <label class="side-checkbox-row">
+                    <input 
+                      type="checkbox" 
+                      [checked]="item.selectedSideId === side.id" 
+                      (change)="selectSide(item, side)"
+                    >
+                    <div class="side-info">
+                      <span class="side-name">{{ side.food_name }}</span>
+                      <span class="side-meta">{{ side.portion }} — {{ side.calories }} cal</span>
+                    </div>
+                  </label>
                 </li>
               </ul>
             </div>

@@ -37,9 +37,11 @@ public class FoodRepository {
   }
 
   private String normalizeFoodRole(String raw) {
-    if (raw == null) return "main";
+    if (raw == null || raw.trim().isEmpty()) return "main_food";
     String trimmed = raw.trim().toLowerCase();
-    return "side".equals(trimmed) ? "side" : "main";
+    if (trimmed.contains("standalone")) return "standalone_food";
+    if (trimmed.contains("side")) return "side_food";
+    return "main_food";
   }
 
   public Future<JsonArray> search(String query) {
@@ -74,10 +76,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -148,10 +147,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -233,10 +229,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -310,10 +303,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -492,7 +482,7 @@ public class FoodRepository {
         food_name = COALESCE($2, food_name),
         category = COALESCE($3, category),
         meal_type = COALESCE($4, meal_type),
-        food_role = COALESCE($5, food_role),
+        food_role = CASE WHEN $5 IS NOT NULL AND $5 <> '' THEN $5 ELSE food_role END,
         portion_amount = COALESCE($6, portion_amount),
         portion_unit = COALESCE($7, portion_unit),
         calories_kcal = COALESCE($8, calories_kcal),
@@ -740,10 +730,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -856,10 +843,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision
@@ -909,7 +893,7 @@ public class FoodRepository {
       .put("definition", row.getString("definition"))
       .put("image_url", row.getString("image_url"))
       .put("meal_type", row.getString("meal_type"))
-      .put("food_role", row.getString("food_role"))
+      .put("food_role", normalizeFoodRole(row.getString("food_role")))
       .put("item_type", row.getString("item_type"))
       .put("components_json", decodeJsonValue(row.getValue("components_json")))
       .put("portion_amount", row.getDouble("portion_amount"))
@@ -1009,10 +993,7 @@ public class FoodRepository {
             to_jsonb(food_items)->>'image'
           ) AS image_url,
           to_jsonb(food_items)->>'meal_type' AS meal_type,
-          COALESCE(
-            to_jsonb(food_items)->>'food_role',
-            CASE WHEN LOWER(COALESCE(to_jsonb(food_items)->>'meal_type', '')) = 'side' THEN 'side' ELSE 'main' END
-          ) AS food_role,
+          COALESCE(food_role, CASE WHEN LOWER(COALESCE(meal_type, '')) = 'side' THEN 'side_food' ELSE 'main_food' END) AS food_role,
           COALESCE(
             (to_jsonb(food_items)->>'portion_amount')::numeric::double precision,
             (to_jsonb(food_items)->>'portion_value')::numeric::double precision

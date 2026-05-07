@@ -45,7 +45,7 @@ export class AdminDashboardComponent {
   vitaminRows: Array<{ label: string; value: string }> = [{ label: '', value: '' }];
 
   readonly trafficLights: TrafficLight[] = ['SAFE', 'CAUTION', 'AVOID'];
-  readonly foodRoles = ['main', 'side'] as const;
+  readonly foodRoles = ['main_food', 'side_food', 'standalone_food'] as const;
   readonly mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
   readonly categories = ['Fruits', 'Vegetables', 'Grains', 'Carbohydrates', 'Protein', 'Dairy', 'Nuts and Seeds'];
   readonly healthEffectKeys = [
@@ -61,7 +61,7 @@ export class AdminDashboardComponent {
     { key: 'weight_gain', label: 'Weight Gain' }
   ] as const;
   readonly healthEffectOptions = [
-    { value: '', label: 'â€”' },
+    { value: '', label: '—' },
     { value: 'good', label: 'Good' },
     { value: 'neutral', label: 'Neutral' },
     { value: 'bad', label: 'Bad' }
@@ -134,7 +134,7 @@ export class AdminDashboardComponent {
       food_name: item.food_name,
       category: item.category ?? 'Vegetables',
       meal_type: item.meal_type,
-      food_role: (item as any).food_role ?? ((item.meal_type ?? '').toLowerCase() === 'side' ? 'side' : 'main'),
+      food_role: this.foodRoleLabel(item),
       portion_amount: item.portion_amount,
       portion_unit: item.portion_unit,
       calories: item.calories,
@@ -357,21 +357,26 @@ export class AdminDashboardComponent {
     return item.id;
   }
 
-  foodRoleLabel(item: AdminFoodItem | null | undefined): 'main' | 'side' {
-    if (!item) return 'main';
+  foodRoleLabel(item: AdminFoodItem | null | undefined): string {
+    if (!item) return 'main_food';
     const explicit = ((item as any).food_role ?? '').toString().trim().toLowerCase();
-    if (explicit === 'side') return 'side';
-    if (explicit === 'main') return 'main';
+    
+    if (explicit.includes('standalone')) return 'standalone_food';
+    if (explicit.includes('side')) return 'side_food';
+    if (explicit.includes('main')) return 'main_food';
 
+    // Check meal_type as a secondary hint
     const mt = (item.meal_type ?? '').toString().trim().toLowerCase();
-    return mt === 'side' ? 'side' : 'main';
+    if (mt === 'side' || mt === 'side_food') return 'side_food';
+    
+    return 'main_food';
   }
 
   private emptyForm(): Partial<AdminFoodItem> {
     return {
       food_name: '',
       meal_type: 'breakfast',
-      food_role: 'main',
+      food_role: 'main_food',
       portion_amount: 1,
       portion_unit: 'serving',
       calories: 0,
@@ -431,8 +436,9 @@ export class AdminDashboardComponent {
     const portionAmount = Math.max(0, num(form.portion_amount));
     const calories = Math.max(0, Math.round(num(form.calories)));
     const glycemicIndex = Math.max(0, Math.round(num((form as any).glycemic_index)));
-    const foodRole = text((form as any).food_role || 'main').toLowerCase() || 'main';
-    const normalizedFoodRole = foodRole === 'side' ? 'side' : 'main';
+    const rawRole = (form as any).food_role || 'main_food';
+    const normalizedFoodRole = rawRole.toString().toLowerCase().includes('standalone') ? 'standalone_food' :
+                             rawRole.toString().toLowerCase().includes('side') ? 'side_food' : 'main_food';
 
     return {
       food_name: text(form.food_name),
@@ -474,11 +480,11 @@ export class AdminDashboardComponent {
 
   vitaminsPreview(raw: Record<string, unknown> | null | undefined): string {
     const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
-    if (!obj) return 'â€”';
+    if (!obj) return '—';
     const pairs = Object.entries(obj)
       .map(([k, v]) => [k, (v ?? '').toString().trim()] as const)
       .filter(([k, v]) => k.trim() && v);
-    if (!pairs.length) return 'â€”';
+    if (!pairs.length) return '—';
     return pairs
       .slice(0, 3)
       .map(([k, v]) => `${k}: ${v}`)
@@ -487,8 +493,8 @@ export class AdminDashboardComponent {
 
   ingredientsPreview(raw: string | null | undefined): string {
     const s = (raw ?? '').toString().trim();
-    if (!s) return 'â€”';
-    return s.length > 60 ? `${s.slice(0, 60)}â€¦` : s;
+    if (!s) return '—';
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
   }
 
   private vitaminRowsFrom(raw: Record<string, unknown> | null | undefined): Array<{ label: string; value: string }> {
@@ -533,4 +539,3 @@ export class AdminDashboardComponent {
     }, 0);
   }
 }
-

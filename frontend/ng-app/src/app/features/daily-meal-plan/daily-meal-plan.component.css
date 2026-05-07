@@ -352,15 +352,34 @@
       gap: 4px;
     }
 
+    .side-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .side-checkbox-row input[type="checkbox"] {
+      margin: 0;
+      accent-color: var(--brand);
+    }
+
     .side-item {
-      padding: 2px 0;
+      padding: 4px 0;
+      border-bottom: 1px solid #eef2ed;
+    }
+
+    .side-item:last-child {
+      border-bottom: none;
     }
 
     .side-info {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
+      font-size: 13px;
+      flex: 1;
     }
 
     .side-name {

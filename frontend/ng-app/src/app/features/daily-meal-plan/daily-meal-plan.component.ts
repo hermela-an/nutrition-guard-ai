@@ -19,6 +19,7 @@ interface MealItem {
   traffic_light?: string;
   eaten?: boolean;
   sides?: MealItem[];
+  selectedSideId?: number | null;
 }
 
 interface MealBlock {
@@ -212,6 +213,15 @@ export class DailyMealPlanComponent {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  selectSide(item: MealItem, side: MealItem): void {
+    if (item.selectedSideId === side.id) {
+      item.selectedSideId = null;
+    } else {
+      item.selectedSideId = side.id;
+    }
+    this.cdr.detectChanges();
   }
 
   private recomputeEatenTotals(): void {

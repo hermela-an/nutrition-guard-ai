@@ -77,7 +77,7 @@ public class FoodImportService {
     clean.put("food_name", findString(raw, "Unnamed Imported Food", "food_name", "name", "title", "label", "item_name"));
     clean.put("category", findString(raw, "Vegetables", "category", "food_category", "group", "food_group", "type_category"));
     clean.put("meal_type", findString(raw, "custom", "meal_type", "meal", "occasion", "category_meal"));
-    clean.put("food_role", findString(raw, "main", "food_role", "role", "item_role", "side_or_main"));
+    clean.put("food_role", findString(raw, "main_food", "food_role", "role", "item_role", "side_or_main"));
 
     // Portion Information
     clean.put("portion_amount", findDouble(raw, 1.0, "portion_amount", "portion_value", "amount", "quantity", "serving_size"));

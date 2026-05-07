@@ -50,20 +50,8 @@ public class FilterService {
   }
 
   private boolean needsSideFood(JsonObject food) {
-    String name = food.getString("food_name", "").toLowerCase();
     String role = food.getString("food_role", "").toLowerCase();
-    
-    // Only main foods typically need sides
-    if (!"main".equals(role) && !"main_food".equals(role)) {
-      return false;
-    }
-    
-    // Ethiopian stews typically end with "Wat"
-    if (name.endsWith(" wat")) {
-      return true;
-    }
-    
-    return false;
+    return "main".equals(role) || "main_food".equals(role);
   }
 
   private JsonArray pickSafe(JsonArray input, JsonObject health, boolean preferHigh, boolean preferLow) {
