@@ -26,6 +26,7 @@ public class VitaminChatService {
   private static final String GEMINI_MODEL = "gemini-1.5-flash";
   private static final String GEMINI_ENDPOINT =
     "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent";
+  private static final String USDA_ENDPOINT = "https://api.nal.usda.gov/fdc/v1/foods/search";
 
   private static final String SYSTEM_PROMPT = """
     NutritionGuard AI – Flexible Hybrid Prompt
@@ -163,7 +164,24 @@ public class VitaminChatService {
       ));
     }
 
-    // 2. Vitamin & Food Search (Hybrid DB + AI mode)
+    // 2a. Nutrient / Vitamin query detection (before food search)
+    String nutrientName = detectNutrientQuery(q);
+    if (!nutrientName.isEmpty()) {
+      String vitaminDbKey = nutrientToVitaminKey(nutrientName);
+      if (!vitaminDbKey.isEmpty()) {
+        return answerFromDataset(question, vitaminDbKey, 10)
+          .compose(dbResult -> {
+            String dbAnswer = dbResult.getString("answer", "");
+            if (!dbAnswer.isBlank() && !dbAnswer.contains("I don't have")) {
+              return Future.succeededFuture(dbResult);
+            }
+            return callUsdaForNutrient(nutrientName);
+          });
+      }
+      return callUsdaForNutrient(nutrientName);
+    }
+
+    // 2b. Vitamin & Food Search (Hybrid DB + AI mode)
     String foodQuery = extractFoodQuery(q);
     if (!foodQuery.isEmpty()) {
       return foods.search(foodQuery).compose(items -> {
@@ -189,8 +207,14 @@ public class VitaminChatService {
             })
             .recover(err -> Future.succeededFuture(dbResponse));
         } else {
-          // Food not found in DB -> AI Fallback
-          return fallbackToAI(question, buildNoRecordFoodResponse(foodQuery));
+          // USDA Fallback
+          return callUsda(foodQuery).compose(usdaResponse -> {
+            if (usdaResponse != null) {
+              return Future.succeededFuture(usdaResponse);
+            }
+            // AI Fallback (Gemini)
+            return fallbackToAI(question, buildNoRecordFoodResponse(foodQuery));
+          });
         }
       });
     }
@@ -369,6 +393,171 @@ public class VitaminChatService {
     escaped = escaped.replaceAll("(?i)&lt;\\s*/\\s*i\\s*&gt;", "</i>");
 
     return escaped;
+  }
+
+  private Future<JsonObject> callUsdaForNutrient(String nutrientName) {
+    String apiKey = config.usdaApiKey();
+    if (apiKey == null || apiKey.isBlank()) {
+      return Future.succeededFuture(buildNoRecordFoodResponse(nutrientName));
+    }
+
+    String url = USDA_ENDPOINT + "?api_key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8)
+      + "&query=" + URLEncoder.encode(nutrientName, StandardCharsets.UTF_8)
+      + "&pageSize=8";
+
+    return webClient.getAbs(url)
+      .timeout(6000)
+      .send()
+      .map(response -> {
+        if (response.statusCode() != 200) return buildNoRecordFoodResponse(nutrientName);
+        JsonObject json = response.bodyAsJsonObject();
+        JsonArray foodList = json.getJsonArray("foods");
+        if (foodList == null || foodList.isEmpty()) return buildNoRecordFoodResponse(nutrientName);
+
+        String prettyName = Character.toUpperCase(nutrientName.charAt(0)) + nutrientName.substring(1);
+        StringBuilder answer = new StringBuilder();
+        answer.append("<b>Foods rich in ").append(escapeHtml(prettyName)).append("</b><br><ul>");
+
+        int added = 0;
+        for (int i = 0; i < foodList.size() && added < 8; i++) {
+          JsonObject food = foodList.getJsonObject(i);
+          String foodName = food.getString("description", "");
+          if (foodName.isBlank()) continue;
+
+          String nutrientValue = "";
+          JsonArray nutrients = food.getJsonArray("foodNutrients", new JsonArray());
+          for (int j = 0; j < nutrients.size(); j++) {
+            JsonObject n = nutrients.getJsonObject(j);
+            String nName = n.getString("nutrientName", "").toLowerCase();
+            if (nName.contains(nutrientName.toLowerCase())) {
+              Double val = n.getDouble("value");
+              String unit = n.getString("unitName", "");
+              if (val != null) {
+                nutrientValue = " &mdash; " + String.format("%.1f", val) + " " + unit.toLowerCase();
+              }
+              break;
+            }
+          }
+          answer.append("<li>").append(escapeHtml(foodName)).append(nutrientValue).append("</li>");
+          added++;
+        }
+        answer.append("</ul>");
+
+        String definition = prettyName + " is an essential nutrient found in many foods. Top sources are listed below.";
+        return withImageAndDefinition(
+          new JsonObject().put("name", prettyName).put("food_name", prettyName),
+          FALLBACK_IMAGE_URL,
+          definition,
+          answer.toString()
+        );
+      })
+      .recover(err -> {
+        System.err.println("USDA nutrient search error: " + err.getMessage());
+        return Future.succeededFuture(buildNoRecordFoodResponse(nutrientName));
+      });
+  }
+
+  private String detectNutrientQuery(String q) {
+    if (q == null || q.isBlank()) return "";
+    String cleaned = q.trim().toLowerCase()
+      .replaceAll("^(what is|what are|tell me about|define|explain|benefits of|foods with|foods high in|foods rich in|sources of|rich in|high in)\\s+", "")
+      .replaceAll("\\s+(please|today|foods|sources)$", "")
+      .trim();
+
+    return switch (cleaned) {
+      case "folate", "folic acid", "vitamin b9", "b9" -> "folate";
+      case "iron" -> "iron";
+      case "calcium" -> "calcium";
+      case "magnesium" -> "magnesium";
+      case "potassium" -> "potassium";
+      case "zinc" -> "zinc";
+      case "phosphorus" -> "phosphorus";
+      case "vitamin a", "retinol" -> "vitamin a";
+      case "vitamin b1", "thiamine", "b1" -> "thiamine";
+      case "vitamin b2", "riboflavin", "b2" -> "riboflavin";
+      case "vitamin b3", "niacin", "b3" -> "niacin";
+      case "vitamin b6", "pyridoxine", "b6" -> "vitamin b6";
+      case "vitamin b12", "cobalamin", "b12" -> "vitamin b12";
+      case "vitamin c", "ascorbic acid" -> "vitamin c";
+      case "vitamin d" -> "vitamin d";
+      case "vitamin e", "tocopherol" -> "vitamin e";
+      case "vitamin k" -> "vitamin k";
+      case "omega 3", "omega-3", "omega3" -> "omega 3";
+      case "fiber", "dietary fiber", "fibre" -> "fiber";
+      case "sodium", "salt" -> "sodium";
+      case "cholesterol" -> "cholesterol";
+      default -> "";
+    };
+  }
+
+  private String nutrientToVitaminKey(String nutrientName) {
+    return switch (nutrientName.toLowerCase()) {
+      case "vitamin a" -> "vitamin_a";
+      case "vitamin c" -> "vitamin_c";
+      case "vitamin d" -> "vitamin_d";
+      case "vitamin e" -> "vitamin_e";
+      case "vitamin k" -> "vitamin_k";
+      case "thiamine" -> "vitamin_b1";
+      case "riboflavin" -> "vitamin_b2";
+      case "niacin" -> "vitamin_b3";
+      case "vitamin b6" -> "vitamin_b6";
+      case "folate" -> "vitamin_b9";
+      case "vitamin b12" -> "vitamin_b12";
+      default -> "";
+    };
+  }
+
+  private Future<JsonObject> callUsda(String foodQuery) {
+    String apiKey = config.usdaApiKey();
+
+    if (apiKey == null || apiKey.isBlank()) {
+      return Future.succeededFuture(null);
+    }
+
+    String url = USDA_ENDPOINT + "?api_key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8)
+      + "&query=" + URLEncoder.encode(foodQuery, StandardCharsets.UTF_8)
+      + "&pageSize=1";
+
+    return webClient.getAbs(url)
+      .timeout(5000)
+      .send()
+      .map(response -> {
+        if (response.statusCode() != 200) return null;
+        JsonObject json = response.bodyAsJsonObject();
+        JsonArray foods = json.getJsonArray("foods");
+        if (foods == null || foods.isEmpty()) return null;
+
+        JsonObject food = foods.getJsonObject(0);
+        return mapUsdaToInternal(food, foodQuery);
+      })
+      .recover(err -> {
+        System.err.println("USDA API error: " + err.getMessage());
+        return Future.succeededFuture(null);
+      });
+  }
+
+  private JsonObject mapUsdaToInternal(JsonObject usdaFood, String query) {
+    String name = usdaFood.getString("description", query);
+    JsonObject food = new JsonObject().put("food_name", name);
+    
+    JsonArray nutrients = usdaFood.getJsonArray("foodNutrients", new JsonArray());
+    for (int i = 0; i < nutrients.size(); i++) {
+      JsonObject n = nutrients.getJsonObject(i);
+      String nName = n.getString("nutrientName", "").toLowerCase();
+      Double value = n.getDouble("value");
+      if (value == null) continue;
+
+      if (nName.contains("energy") || nName.contains("calories")) food.put("calories", value.intValue());
+      else if (nName.contains("protein")) food.put("protein_g", value);
+      else if (nName.contains("carbohydrate")) food.put("carbs_g", value);
+      else if (nName.contains("total lipid") || nName.contains("fat")) food.put("fat_g", value);
+      else if (nName.contains("fiber")) food.put("fiber_g", value);
+      else if (nName.contains("sugars")) food.put("sugar_g", value);
+      else if (nName.contains("sodium")) food.put("sodium_mg", value);
+      else if (nName.contains("cholesterol")) food.put("cholesterol_mg", value);
+    }
+
+    return buildFoodResponse(food, name);
   }
 
   private Future<String> callGemini(String userPrompt) {
@@ -675,7 +864,8 @@ public class VitaminChatService {
       new JsonObject().put("name", name).put("food_name", name),
       FALLBACK_IMAGE_URL,
       definition,
-      "<b>" + escapeHtml(name) + "</b><br>" + escapeHtml(definition)
+      "<b>" + escapeHtml(name) + "</b><br>" + escapeHtml(definition) + "<br><br>"
+      + "I couldn't find detailed nutrition for this in my sources. Please search on <a href=\"https://www.google.com/search?q=" + URLEncoder.encode(name + " nutrition", StandardCharsets.UTF_8) + "\" target=\"_blank\">Google</a> for more details."
     );
   }
 

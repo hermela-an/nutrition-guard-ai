@@ -29,6 +29,7 @@ public record AppConfig(
   String smtpPassword,
   String smtpFrom,
   String geminiApiKey,
+  String usdaApiKey,
   String remoteSyncUrl
 ) {
   private static final EnvFile ENV_FILE = EnvFile.loadFromWorkingDirectory();
@@ -54,6 +55,7 @@ public record AppConfig(
       strEnv("SMTP_PASSWORD", ""),
       strEnv("SMTP_FROM", "no-reply@nutritionguard.local"),
       strEnv("GEMINI_API_KEY", ""),
+      strEnv("USDA_API_KEY", ""),
       strEnv("REMOTE_SYNC_URL", "")
     );
   }
