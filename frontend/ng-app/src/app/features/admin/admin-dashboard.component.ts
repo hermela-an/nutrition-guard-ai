@@ -40,6 +40,7 @@ export class AdminDashboardComponent {
   pageCount = 1;
 
   editing: AdminFoodItem | null = null;
+  showModal = false;
   form: Partial<AdminFoodItem> = this.emptyForm();
   healthEffect: Record<string, string> = {};
   vitaminRows: Array<{ label: string; value: string }> = [{ label: '', value: '' }];
@@ -124,6 +125,25 @@ export class AdminDashboardComponent {
     this.healthEffect = this.emptyHealthEffect();
     this.vitaminRows = [{ label: '', value: '' }];
     this.imageName = '';
+    this.showModal = true;
+  }
+
+  openAddModal(): void {
+    this.startCreate();
+  }
+
+  openEditModal(item: AdminFoodItem): void {
+    this.startEdit(item);
+    this.showModal = true;
+  }
+
+  closeModal(): void {
+    this.showModal = false;
+    this.cancelEdit();
+  }
+
+  onOverlayClick(event: MouseEvent): void {
+    this.closeModal();
   }
 
   startEdit(item: AdminFoodItem): void {
@@ -229,6 +249,7 @@ export class AdminDashboardComponent {
       .subscribe({
         next: () => {
           this.toast.success(this.editing?.id ? 'Food updated' : 'Food created');
+          this.showModal = false;
           this.cancelEdit();
           this.refresh(true);
         },

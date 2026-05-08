@@ -2,25 +2,72 @@
   display: block;
 }
 
-.admin-layout {
-  display: grid;
-  grid-template-columns: minmax(320px, 460px) 1fr;
-  gap: 12px;
-  margin-top: 12px;
-  align-items: start;
+/* ─── Compact Toolbar (single-row search + add + filters) ─── */
+.compact-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  background: var(--panel, #fff);
+  border: 1px solid var(--line, #d8dfcf);
+  border-radius: var(--radius, 16px);
+  box-shadow: var(--shadow, 0 12px 32px rgba(26, 34, 22, 0.08));
 }
 
-@media (max-width: 900px) {
-  .admin-layout {
-    grid-template-columns: 1fr;
+.toolbar-search {
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 260px;
+}
+
+.toolbar-select {
+  flex: 0 1 180px;
+  min-width: 130px;
+}
+
+@media (max-width: 640px) {
+  .compact-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-search,
+  .toolbar-select {
+    max-width: none;
   }
 }
 
+/* ─── Sticky Table Header ─── */
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel, #fff);
+  box-shadow: inset 0 -1px 0 var(--line, #d8dfcf);
+}
+
+/* ─── Cell Truncation ─── */
+.cell-truncate {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-truncate-td {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Form Grid (used inside modal) ─── */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 12px;
 }
 
 @media (max-width: 640px) {
@@ -98,4 +145,117 @@
   align-items: center;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+
+/* ─── Modal Overlay ─── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 94vw;
+  max-width: 720px;
+  max-height: 88vh;
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22), 0 2px 12px rgba(0, 0, 0, 0.08);
+  animation: slideUp 0.25s ease;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary, #111);
+}
+
+.modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ─── Responsive modal ─── */
+@media (max-width: 640px) {
+  .modal-container {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    padding: 16px 16px 10px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+  }
 }

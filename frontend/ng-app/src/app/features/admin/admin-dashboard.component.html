@@ -8,265 +8,258 @@
     <a class="btn ghost" routerLink="/dashboard">Open user app</a>
     <button type="button" class="btn ghost" (click)="refresh(true)">Refresh</button>
     <button type="button" class="btn ghost" (click)="syncDatabase()">Sync Database</button>
-    <button type="button" class="btn ghost" (click)="jsonFile.click()">Import JSON</button>
+    <button type="button" class="btn ghost" (click)="jsonFile.click()">Import Food JSON</button>
     <input #jsonFile type="file" accept=".json" style="display:none" (change)="importJson($event, jsonFile)" />
-    <button type="button" class="btn primary" (click)="startCreate()">Add food</button>
   </div>
 </div>
 
 <div class="card error" *ngIf="error">{{ error }}</div>
 <div class="card" *ngIf="loading">Loading...</div>
 
-<div class="card" *ngIf="!loading">
-  <div class="toolbar">
-    <div class="search-row">
-      <input class="input" type="text" [(ngModel)]="query" placeholder="Search foods..." (keyup.enter)="refresh(true)" />
-      <button type="button" class="btn" (click)="refresh(true)">Search</button>
-    </div>
+<div class="compact-toolbar" *ngIf="!loading">
+  <input class="input toolbar-search" type="text" [(ngModel)]="query" placeholder="Search foods..." (keyup.enter)="refresh(true)" />
+  <button type="button" class="btn ghost" (click)="refresh(true)">Search</button>
+  <button type="button" class="btn primary" (click)="openAddModal()">+ Add Food</button>
+  <select class="input toolbar-select" [(ngModel)]="mealFilter" (change)="applyFilters(true)">
+    <option value="ALL">All meals</option>
+    <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
+  </select>
+  <select class="input toolbar-select" [(ngModel)]="lightFilter" (change)="applyFilters(true)">
+    <option value="ALL">All traffic lights</option>
+    <option value="SAFE">Safe</option>
+    <option value="CAUTION">Caution</option>
+    <option value="AVOID">Avoid</option>
+  </select>
+</div>
 
-    <div class="filters">
-      <select class="input" style="max-width:200px;" [(ngModel)]="mealFilter" (change)="applyFilters(true)">
-        <option value="ALL">All meals</option>
-        <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
-      </select>
-      <select class="input" style="max-width:200px;" [(ngModel)]="lightFilter" (change)="applyFilters(true)">
-        <option value="ALL">All traffic lights</option>
-        <option value="SAFE">Safe</option>
-        <option value="CAUTION">Caution</option>
-        <option value="AVOID">Avoid</option>
-      </select>
-    </div>
+<!-- ─── Food Table ─── -->
+<div class="card" *ngIf="!loading">
+  <div class="card-head">
+    <h3>Foods ({{ filteredFoods.length }})</h3>
+    <span class="muted">Image + macros + traffic light</span>
+  </div>
+
+  <div class="table-wrap" style="margin-top:12px;" *ngIf="pagedFoods.length > 0; else empty">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Food</th>
+          <th>Meal</th>
+          <th>Type</th>
+          <th>Traffic light</th>
+          <th>Calories</th>
+          <th>Macros</th>
+          <th>Fiber/Sugar</th>
+          <th>Vitamins</th>
+          <th>Ingredients</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let f of pagedFoods; let i = index; trackBy: trackById">
+          <td class="muted small">{{ f.id }}</td>
+          <td>
+            <div class="row-media">
+              <img *ngIf="f.image_url" class="thumb" [src]="f.image_url" alt="" />
+              <div class="thumb placeholder" *ngIf="!f.image_url">NG</div>
+              <div>
+                <strong>{{ f.food_name }}</strong>
+                <div class="muted small cell-truncate">{{ f.definition || '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td>{{ f.meal_type }}</td>
+          <td class="muted small">{{ foodRoleLabel(f) }}</td>
+          <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
+          <td>{{ f.calories | number:'1.0-0' }}</td>
+          <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
+          <td class="muted small">{{ f.fiber_g }}F · {{ f.sugar_g }}S</td>
+          <td class="muted small cell-truncate-td">{{ vitaminsPreview(f.vitamins) }}</td>
+          <td class="muted small cell-truncate-td">{{ ingredientsPreview(f.ingredients) }}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn ghost small" (click)="openEditModal(f)">Edit</button>
+              <button type="button" class="btn danger small" (click)="delete(f)">Delete</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ng-template #empty>
+    <div class="empty muted">No foods found.</div>
+  </ng-template>
+
+  <div class="pagination" *ngIf="filteredFoods.length > pageSize">
+    <button type="button" class="btn ghost small" (click)="setPage(page - 1)" [disabled]="page <= 1">Prev</button>
+    <span class="muted small">Page {{ page }} / {{ pageCount }}</span>
+    <button type="button" class="btn ghost small" (click)="setPage(page + 1)" [disabled]="page >= pageCount">Next</button>
   </div>
 </div>
 
-<div class="admin-layout" *ngIf="!loading">
-  <div class="card">
-    <div class="card-head">
-      <h3>{{ editing ? 'Edit food' : 'Add food' }}</h3>
-      <button type="button" class="btn ghost small" *ngIf="editing" (click)="cancelEdit()">Cancel</button>
+<!-- ─── Modal Overlay ─── -->
+<div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
+  <div class="modal-container" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editing ? 'Edit Food' : 'Add Food' }}</h3>
+      <button type="button" class="modal-close-btn" (click)="closeModal()" title="Close">&times;</button>
     </div>
 
-    <div class="form-grid">
-      <div class="section-title">Basics</div>
-      <label>
-        <span class="label">Food name *</span>
-        <input #foodNameInput class="input" type="text" [(ngModel)]="form.food_name" />
-      </label>
-      <label>
-        <span class="label">Category</span>
-        <select class="input" [(ngModel)]="form.category">
-          <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
-        </select>
-      </label>
-      <label>
-        <span class="label">Meal type *</span>
-        <select class="input" [(ngModel)]="form.meal_type">
-          <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
-        </select>
-      </label>
-      <label>
-        <span class="label">Food role</span>
-        <select class="input" [(ngModel)]="form.food_role">
-          <option *ngFor="let r of foodRoles" [value]="r">{{ r }}</option>
-        </select>
-      </label>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="section-title">Basics</div>
+        <label>
+          <span class="label">Food name *</span>
+          <input #foodNameInput class="input" type="text" [(ngModel)]="form.food_name" />
+        </label>
+        <label>
+          <span class="label">Category</span>
+          <select class="input" [(ngModel)]="form.category">
+            <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Meal type *</span>
+          <select class="input" [(ngModel)]="form.meal_type">
+            <option *ngFor="let mt of mealTypes" [value]="mt">{{ mt }}</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Food role</span>
+          <select class="input" [(ngModel)]="form.food_role">
+            <option *ngFor="let r of foodRoles" [value]="r">{{ r }}</option>
+          </select>
+        </label>
 
-      <label>
-        <span class="label">Traffic light</span>
-        <select class="input" [(ngModel)]="form.traffic_light">
-          <option *ngFor="let t of trafficLights" [value]="t">{{ t }}</option>
-        </select>
-      </label>
-      <label class="span-all">
-        <span class="label">Food image</span>
-        <input id="foodImageFile" #imageFile class="file-input" type="file" accept="image/*" (change)="onImageSelected($event, imageFile)" />
-        <div class="file-row" style="margin-top:6px;">
-          <label class="btn ghost small" for="foodImageFile">Choose image</label>
-          <span class="muted small file-name">{{ imageName || 'No file selected' }}</span>
-          <button type="button" class="btn ghost small" *ngIf="imageName" (click)="clearImage(imageFile)">Remove</button>
-        </div>
-        <div class="row-media" style="margin-top:10px;" *ngIf="form.image_url">
-          <img class="thumb" [src]="form.image_url" alt="" />
-          <span class="muted small">Preview</span>
-        </div>
-        <div class="muted small" style="margin-top:8px;">
-          Tip: images are saved as a data URL (no external link needed).
-        </div>
-      </label>
+        <label>
+          <span class="label">Traffic light</span>
+          <select class="input" [(ngModel)]="form.traffic_light">
+            <option *ngFor="let t of trafficLights" [value]="t">{{ t }}</option>
+          </select>
+        </label>
+        <label class="span-all">
+          <span class="label">Food image</span>
+          <input id="modalFoodImageFile" #imageFile class="file-input" type="file" accept="image/*" (change)="onImageSelected($event, imageFile)" />
+          <div class="file-row" style="margin-top:6px;">
+            <label class="btn ghost small" for="modalFoodImageFile">Choose image</label>
+            <span class="muted small file-name">{{ imageName || 'No file selected' }}</span>
+            <button type="button" class="btn ghost small" *ngIf="imageName" (click)="clearImage(imageFile)">Remove</button>
+          </div>
+          <div class="row-media" style="margin-top:10px;" *ngIf="form.image_url">
+            <img class="thumb" [src]="form.image_url" alt="" />
+            <span class="muted small">Preview</span>
+          </div>
+          <div class="muted small" style="margin-top:8px;">
+            Tip: images are saved as a data URL (no external link needed).
+          </div>
+        </label>
 
-      <div class="section-title">Nutrition</div>
-      <label>
-        <span class="label">Calories</span>
-        <input class="input" type="number" [(ngModel)]="form.calories" />
-      </label>
-      <label>
-        <span class="label">Portion</span>
-        <div class="grid-2" style="gap:10px;">
-          <input class="input" type="number" [(ngModel)]="form.portion_amount" />
-          <input class="input" type="text" [(ngModel)]="form.portion_unit" />
-        </div>
-      </label>
+        <div class="section-title">Nutrition</div>
+        <label>
+          <span class="label">Calories</span>
+          <input class="input" type="number" [(ngModel)]="form.calories" />
+        </label>
+        <label>
+          <span class="label">Portion</span>
+          <div class="grid-2" style="gap:10px;">
+            <input class="input" type="number" [(ngModel)]="form.portion_amount" />
+            <input class="input" type="text" [(ngModel)]="form.portion_unit" />
+          </div>
+        </label>
 
-      <label>
-        <span class="label">Protein (g)</span>
-        <input class="input" type="number" [(ngModel)]="form.protein_g" />
-      </label>
-      <label>
-        <span class="label">Carbs (g)</span>
-        <input class="input" type="number" [(ngModel)]="form.carbs_g" />
-      </label>
-      <label>
-        <span class="label">Fat (g)</span>
-        <input class="input" type="number" [(ngModel)]="form.fat_g" />
-      </label>
-      <label>
-        <span class="label">Fiber (g)</span>
-        <input class="input" type="number" [(ngModel)]="form.fiber_g" />
-      </label>
-      <label>
-        <span class="label">Sugar (g)</span>
-        <input class="input" type="number" [(ngModel)]="form.sugar_g" />
-      </label>
-      <label>
-        <span class="label">Sodium (mg)</span>
-        <input class="input" type="number" [(ngModel)]="form.sodium_mg" />
-      </label>
-      <label>
-        <span class="label">Cholesterol (mg)</span>
-        <input class="input" type="number" [(ngModel)]="form.cholesterol_mg" />
-      </label>
-      <label>
-        <span class="label">Glycemic index</span>
-        <input class="input" type="number" [(ngModel)]="form.glycemic_index" />
-      </label>
+        <label>
+          <span class="label">Protein (g)</span>
+          <input class="input" type="number" [(ngModel)]="form.protein_g" />
+        </label>
+        <label>
+          <span class="label">Carbs (g)</span>
+          <input class="input" type="number" [(ngModel)]="form.carbs_g" />
+        </label>
+        <label>
+          <span class="label">Fat (g)</span>
+          <input class="input" type="number" [(ngModel)]="form.fat_g" />
+        </label>
+        <label>
+          <span class="label">Fiber (g)</span>
+          <input class="input" type="number" [(ngModel)]="form.fiber_g" />
+        </label>
+        <label>
+          <span class="label">Sugar (g)</span>
+          <input class="input" type="number" [(ngModel)]="form.sugar_g" />
+        </label>
+        <label>
+          <span class="label">Sodium (mg)</span>
+          <input class="input" type="number" [(ngModel)]="form.sodium_mg" />
+        </label>
+        <label>
+          <span class="label">Cholesterol (mg)</span>
+          <input class="input" type="number" [(ngModel)]="form.cholesterol_mg" />
+        </label>
+        <label>
+          <span class="label">Glycemic index</span>
+          <input class="input" type="number" [(ngModel)]="form.glycemic_index" />
+        </label>
 
-      <div class="section-title">Health effects</div>
-      <div class="span-all">
-        <div class="muted small">Health effect (per condition)</div>
-        <div class="health-grid">
-          <label *ngFor="let h of healthEffectKeys">
-            <span class="label">{{ h.label }}</span>
-            <select class="input" [(ngModel)]="healthEffect[h.key]">
-              <option *ngFor="let opt of healthEffectOptions" [value]="opt.value">{{ opt.label }}</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <div class="section-title">Details</div>
-      <label class="span-all">
-        <span class="label">Definition</span>
-        <textarea class="input" rows="3" [(ngModel)]="form.definition"></textarea>
-      </label>
-
-      <label class="span-all">
-        <span class="label">Ingredients</span>
-        <textarea class="input" rows="3" [(ngModel)]="form.ingredients" placeholder="List ingredients..."></textarea>
-      </label>
-
-      <div class="section-title">Vitamins</div>
-      <div class="span-all">
-        <div class="muted small">Vitamins (JSON)</div>
-        <div class="vitamins-grid">
-          <div *ngFor="let row of vitaminRows; let i = index" class="vitamin-item">
-            <label class="vitamin-field">
-              <span class="label">Vitamin</span>
-              <input class="input" type="text" placeholder="e.g. iron" [(ngModel)]="vitaminRows[i].label" />
+        <div class="section-title">Health effects</div>
+        <div class="span-all">
+          <div class="muted small">Health effect (per condition)</div>
+          <div class="health-grid">
+            <label *ngFor="let h of healthEffectKeys">
+              <span class="label">{{ h.label }}</span>
+              <select class="input" [(ngModel)]="healthEffect[h.key]">
+                <option *ngFor="let opt of healthEffectOptions" [value]="opt.value">{{ opt.label }}</option>
+              </select>
             </label>
-            <label class="vitamin-field">
-              <span class="label">Value</span>
-              <input class="input" type="text" placeholder="e.g. 2 mg" [(ngModel)]="vitaminRows[i].value" />
-            </label>
-            <button
-              type="button"
-              class="btn ghost small vitamin-remove"
-              (click)="removeVitaminRow(i)"
-              [disabled]="vitaminRows.length <= 1"
-            >
-              Remove
-            </button>
           </div>
         </div>
-        <div class="vitamins-actions">
-          <button type="button" class="btn ghost small" (click)="addVitaminRow()">Add Vitamin</button>
-          <span class="muted small">Saved as JSON</span>
+
+        <div class="section-title">Details</div>
+        <label class="span-all">
+          <span class="label">Definition</span>
+          <textarea class="input" rows="3" [(ngModel)]="form.definition"></textarea>
+        </label>
+
+        <label class="span-all">
+          <span class="label">Ingredients</span>
+          <textarea class="input" rows="3" [(ngModel)]="form.ingredients" placeholder="List ingredients..."></textarea>
+        </label>
+
+        <div class="section-title">Vitamins</div>
+        <div class="span-all">
+          <div class="muted small">Vitamins (JSON)</div>
+          <div class="vitamins-grid">
+            <div *ngFor="let row of vitaminRows; let i = index" class="vitamin-item">
+              <label class="vitamin-field">
+                <span class="label">Vitamin</span>
+                <input class="input" type="text" placeholder="e.g. iron" [(ngModel)]="vitaminRows[i].label" />
+              </label>
+              <label class="vitamin-field">
+                <span class="label">Value</span>
+                <input class="input" type="text" placeholder="e.g. 2 mg" [(ngModel)]="vitaminRows[i].value" />
+              </label>
+              <button
+                type="button"
+                class="btn ghost small vitamin-remove"
+                (click)="removeVitaminRow(i)"
+                [disabled]="vitaminRows.length <= 1"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+          <div class="vitamins-actions">
+            <button type="button" class="btn ghost small" (click)="addVitaminRow()">Add Vitamin</button>
+            <span class="muted small">Saved as JSON</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="modal-actions">
+    <div class="modal-footer">
+      <button type="button" class="btn ghost" (click)="closeModal()">Cancel</button>
       <button type="button" class="btn primary" (click)="save()">{{ editing ? 'Save changes' : 'Create food' }}</button>
     </div>
   </div>
-
-  <div class="card">
-    <div class="card-head">
-      <h3>Foods ({{ filteredFoods.length }})</h3>
-      <span class="muted">Image + macros + traffic light</span>
-    </div>
-
-    <div class="table-wrap" style="margin-top:12px;" *ngIf="pagedFoods.length > 0; else empty">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Food</th>
-            <th>Meal</th>
-            <th>Type</th>
-            <th>Traffic light</th>
-            <th>Calories</th>
-            <th>Macros</th>
-            <th>Fiber/Sugar</th>
-            <th>Sodium/Chol</th>
-            <th>GI</th>
-            <th>Vitamins</th>
-            <th>Ingredients</th>
-            <th style="text-align:right;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let f of pagedFoods; let i = index; trackBy: trackById">
-            <td class="muted small">{{ f.id }}</td>
-            <td>
-              <div class="row-media">
-                <img *ngIf="f.image_url" class="thumb" [src]="f.image_url" alt="" />
-                <div class="thumb placeholder" *ngIf="!f.image_url">NG</div>
-                <div>
-                  <strong>{{ f.food_name }}</strong>
-                  <div class="muted small">{{ f.definition || '—' }}</div>
-                </div>
-              </div>
-            </td>
-            <td>{{ f.meal_type }}</td>
-            <td class="muted small">{{ foodRoleLabel(f) }}</td>
-            <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
-            <td>{{ f.calories | number:'1.0-0' }}</td>
-            <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
-            <td class="muted small">{{ f.fiber_g }}F · {{ f.sugar_g }}S</td>
-            <td class="muted small">{{ f.sodium_mg }}Na · {{ f.cholesterol_mg }}Ch</td>
-            <td class="muted small">{{ f.glycemic_index }}</td>
-            <td class="muted small">{{ vitaminsPreview(f.vitamins) }}</td>
-            <td class="muted small">{{ ingredientsPreview(f.ingredients) }}</td>
-            <td>
-              <div class="row-actions">
-                <button type="button" class="btn ghost small" (click)="startEdit(f)">Edit</button>
-                <button type="button" class="btn danger small" (click)="delete(f)">Delete</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <ng-template #empty>
-      <div class="empty muted">No foods found.</div>
-    </ng-template>
-
-    <div class="pagination" *ngIf="filteredFoods.length > pageSize">
-      <button type="button" class="btn ghost small" (click)="setPage(page - 1)" [disabled]="page <= 1">Prev</button>
-      <span class="muted small">Page {{ page }} / {{ pageCount }}</span>
-      <button type="button" class="btn ghost small" (click)="setPage(page + 1)" [disabled]="page >= pageCount">Next</button>
-    </div>
-  </div>
 </div>
-
