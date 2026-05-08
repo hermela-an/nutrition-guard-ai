@@ -346,13 +346,24 @@ export class AdminDashboardComponent {
           })
         ).subscribe({
           next: (res) => {
-            this.toast.success(res.message || `Successfully imported ${res.count} items.`);
+            const msg = res.message || `Successfully imported ${res.count} items.`;
+            this.toast.success(msg);
+            localStorage.setItem('lastJsonImport', JSON.stringify({
+              success: true,
+              message: msg,
+              timestamp: new Date().toISOString()
+            }));
             this.refresh(true);
           },
           error: (err) => {
             const msg = this.errorFrom(err, 'Import failed.');
             this.error = msg;
             this.toast.error(msg);
+            localStorage.setItem('lastJsonImport', JSON.stringify({
+              success: false,
+              message: msg,
+              timestamp: new Date().toISOString()
+            }));
           }
         });
       } catch (e) {

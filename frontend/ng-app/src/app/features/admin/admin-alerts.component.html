@@ -2,56 +2,77 @@
   <div>
     <div class="eyebrow">Admin</div>
     <h2>Alerts</h2>
-    <p class="muted">Quickly review foods flagged as Caution or Avoid.</p>
+    <p class="muted">Monitor user activity, food data issues, and system events.</p>
   </div>
   <div class="actions">
-    <button type="button" class="btn ghost" (click)="setFilter('CAUTION')" [class.active]="filter === 'CAUTION'">Caution</button>
-    <button type="button" class="btn ghost" (click)="setFilter('AVOID')" [class.active]="filter === 'AVOID'">Avoid</button>
+    <button type="button" class="btn ghost" (click)="refresh()">Refresh</button>
   </div>
 </div>
 
 <div class="card error" *ngIf="error">{{ error }}</div>
 <div class="card" *ngIf="loading">Loading...</div>
 
-<div class="card" *ngIf="!loading">
-  <div class="search-row">
-    <input class="input" type="text" [(ngModel)]="query" placeholder="Search foods..." (keyup.enter)="refresh()" />
-    <button type="button" class="btn" (click)="refresh()">Search</button>
+<!-- ─── Summary Cards ─── -->
+<div class="alert-summary" *ngIf="!loading && !error">
+  <div class="summary-card" (click)="levelFilter = 'ALL'; applyFilters()">
+    <div class="summary-count">{{ totalCount }}</div>
+    <div class="summary-label muted small">Total</div>
+  </div>
+  <div class="summary-card summary-info" (click)="levelFilter = 'info'; applyFilters()">
+    <div class="summary-count">{{ infoCount }}</div>
+    <div class="summary-label muted small">Info</div>
+  </div>
+  <div class="summary-card summary-warning" (click)="levelFilter = 'warning'; applyFilters()">
+    <div class="summary-count">{{ warningCount }}</div>
+    <div class="summary-label muted small">Warnings</div>
+  </div>
+  <div class="summary-card summary-error" (click)="levelFilter = 'error'; applyFilters()">
+    <div class="summary-count">{{ errorCount }}</div>
+    <div class="summary-label muted small">Errors</div>
+  </div>
+</div>
+
+<!-- ─── Filters Toolbar ─── -->
+<div class="compact-toolbar" *ngIf="!loading && !error">
+  <input class="input toolbar-search" type="text" [(ngModel)]="searchQuery" placeholder="Search alerts..."
+    (keyup.enter)="applyFilters()" (input)="applyFilters()" />
+  <select class="input toolbar-select" [(ngModel)]="categoryFilter" (change)="applyFilters()">
+    <option *ngFor="let c of categories" [value]="c.value">{{ c.label }}</option>
+  </select>
+  <select class="input toolbar-select" [(ngModel)]="levelFilter" (change)="applyFilters()">
+    <option *ngFor="let l of levels" [value]="l.value">{{ l.label }}</option>
+  </select>
+</div>
+
+<!-- ─── Alert List ─── -->
+<div class="card" *ngIf="!loading && !error">
+  <div class="card-head">
+    <h3>System Alerts ({{ filteredAlerts.length }})</h3>
+    <span class="muted small">Generated from current system data</span>
   </div>
 
-  <div class="table-wrap" style="margin-top:12px;" *ngIf="foods.length > 0; else empty">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Food</th>
-          <th>Meal</th>
-          <th>Traffic light</th>
-          <th>Calories</th>
-          <th>Macros</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let f of foods">
-          <td class="row-title">
-            <div class="row-media">
-              <img *ngIf="f.image_url" class="thumb" [src]="f.image_url" alt="" />
-              <div class="thumb placeholder" *ngIf="!f.image_url">NG</div>
-              <div>
-                <strong>{{ f.food_name }}</strong>
-                <div class="muted small">{{ f.definition || '—' }}</div>
-              </div>
-            </div>
-          </td>
-          <td>{{ f.meal_type }}</td>
-          <td><span class="pill" [ngClass]="lightClass(f.traffic_light)">{{ f.traffic_light || 'SAFE' }}</span></td>
-          <td>{{ f.calories | number:'1.0-0' }}</td>
-          <td class="muted small">{{ f.protein_g }}P · {{ f.carbs_g }}C · {{ f.fat_g }}F</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="alerts-list" *ngIf="filteredAlerts.length > 0; else empty">
+    <div class="alert-row" *ngFor="let a of filteredAlerts; trackBy: trackById"
+      [ngClass]="'alert-row--' + a.level">
+
+      <div class="alert-icon">{{ categoryIcon(a.category) }}</div>
+
+      <div class="alert-body">
+        <div class="alert-top-row">
+          <span class="pill" [ngClass]="levelPillClass(a.level)">{{ levelLabel(a.level) }}</span>
+          <span class="alert-category-tag muted small">{{ categoryLabel(a.category) }}</span>
+          <span class="alert-time muted small">{{ timeAgo(a.timestamp) }}</span>
+        </div>
+        <div class="alert-title">{{ a.title }}</div>
+        <div class="alert-message muted small">{{ a.message }}</div>
+        <div class="alert-related small">
+          <span class="alert-related-label">Related:</span> {{ a.relatedItem }}
+        </div>
+      </div>
+    </div>
   </div>
 
   <ng-template #empty>
-    <div class="empty muted">No alerts found for this filter.</div>
+    <div class="empty muted">No alerts match your filters.</div>
   </ng-template>
 </div>
