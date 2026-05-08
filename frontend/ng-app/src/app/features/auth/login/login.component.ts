@@ -1,4 +1,4 @@
-﻿import { Component, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -28,7 +28,7 @@ export class LoginComponent {
     password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
-  constructor(private readonly auth: AuthService, private readonly router: Router) {}
+  constructor(public readonly auth: AuthService, private readonly router: Router) {}
 
   togglePassword(): void {
     this.showPassword = !this.showPassword;

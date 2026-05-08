@@ -29,7 +29,7 @@ export class ResetPasswordComponent {
 
   constructor(
     route: ActivatedRoute,
-    private readonly auth: AuthService,
+    public readonly auth: AuthService,
     private readonly router: Router
   ) {
     route.queryParamMap.subscribe((params) => {

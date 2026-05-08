@@ -18,7 +18,7 @@ export class VerifyEmailComponent {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly auth = inject(AuthService);
+  public readonly auth = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {

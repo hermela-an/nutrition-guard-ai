@@ -1,7 +1,7 @@
 <main class="auth-wrap">
   <section class="auth-shell">
     <aside class="auth-side">
-      <a class="brand" routerLink="/" style="color:#fff;"><span class="brand-dot"></span> NutriGuard AI</a>
+      <a class="brand" [routerLink]="auth.isAuthenticated() ? '/dashboard' : '/'" style="color:#fff;"><span class="brand-dot"></span> NutriGuard AI</a>
       <h2 style="margin-top:30px;">Verify your email.</h2>
       <p>This helps keep your account secure.</p>
     </aside>

@@ -26,7 +26,7 @@ export class ForgotPasswordComponent {
   });
 
   constructor(
-    private readonly auth: AuthService,
+    public readonly auth: AuthService,
     private readonly router: Router
   ) {}
 

@@ -1,7 +1,7 @@
 
   <header class="top-nav">
     <div class="container">
-      <a class="brand" routerLink="/"><span class="brand-dot"></span> NutriGuard AI</a>
+      <a class="brand" [routerLink]="auth.isAuthenticated() ? '/dashboard' : '/'"><span class="brand-dot"></span> NutriGuard AI</a>
       <nav class="nav-links">
         <a href="#features">Features</a>
         <a routerLink="/login">Login</a>
