@@ -65,24 +65,24 @@ public class NotificationRepository {
     if (ids == null || ids.isEmpty()) {
       return Future.succeededFuture(0);
     }
-    Long[] idArray = new Long[ids.size()];
+    java.util.List<String> placeholders = new java.util.ArrayList<>();
+    Tuple params = Tuple.of(userId);
+    int pIndex = 2;
     for (int i = 0; i < ids.size(); i++) {
       Object v = ids.getValue(i);
       if (v instanceof Number n) {
-        idArray[i] = n.longValue();
+        placeholders.add("$" + pIndex++);
+        params.addLong(n.longValue());
       } else if (v instanceof String s && !s.isBlank()) {
-        idArray[i] = Long.parseLong(s);
-      } else {
-        idArray[i] = null;
+        placeholders.add("$" + pIndex++);
+        params.addLong(Long.parseLong(s));
       }
     }
-    String sql = """
-      UPDATE notifications
-      SET is_read = true
-      WHERE user_id = $1 AND id = ANY($2::bigint[])
-      """;
-    return db.query(sql, Tuple.of(userId, idArray))
-      .map(rows -> rows.rowCount());
+    if (placeholders.isEmpty()) {
+      return Future.succeededFuture(0);
+    }
+    String sql = "UPDATE notifications SET is_read = true WHERE user_id = $1 AND id IN (" + String.join(", ", placeholders) + ")";
+    return db.query(sql, params).map(rows -> rows.rowCount());
   }
 
   public Future<Integer> markAllRead(String userId) {

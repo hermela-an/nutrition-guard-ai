@@ -57,13 +57,17 @@ public class FilterService {
   private JsonArray pickSafe(JsonArray input, JsonObject profile, boolean preferHigh, boolean preferLow) {
     JsonArray selected = new JsonArray();
     
-    // Pass 1: Look for SAFE foods
+    // 1️⃣ Green foods (primary recommendation)
     findForLight(input, profile, "SAFE", selected, preferHigh, preferLow);
     
-    // Pass 2: If we need more, look for CAUTION foods
+    // 2️⃣ Yellow foods (limited / optional)
+    // Only add caution foods if we couldn't find enough safe options
     if (selected.size() < 3) {
       findForLight(input, profile, "CAUTION", selected, preferHigh, preferLow);
     }
+    
+    // 3️⃣ Red foods (never auto-recommend)
+    // "AVOID" foods are intentionally excluded and will never be added to the selected array.
     
     return selected;
   }

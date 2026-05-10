@@ -29,11 +29,42 @@
   </div>
 
   <div class="list" *ngIf="!loading && items.length > 0">
-    <div class="notif card" *ngFor="let item of items" [class.unread]="!item.is_read" (click)="toggleExpanded(item)">
+    <ng-container *ngIf="mealPlanReminders.length > 0">
+      <h3 class="category-title" style="margin-top:20px;margin-bottom:10px;">🥗 Daily Meal Plan Reminders</h3>
+      <ng-container *ngFor="let item of mealPlanReminders">
+        <ng-container *ngTemplateOutlet="notifCard; context: { item: item }"></ng-container>
+      </ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="healthRiskAlerts.length > 0">
+      <h3 class="category-title" style="margin-top:20px;margin-bottom:10px;">⚠️ Health Risk Food Alerts</h3>
+      <ng-container *ngFor="let item of healthRiskAlerts">
+        <ng-container *ngTemplateOutlet="notifCard; context: { item: item }"></ng-container>
+      </ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="healthProfileNotifs.length > 0">
+      <h3 class="category-title" style="margin-top:20px;margin-bottom:10px;">🩺 Health Profile Notifications</h3>
+      <ng-container *ngFor="let item of healthProfileNotifs">
+        <ng-container *ngTemplateOutlet="notifCard; context: { item: item }"></ng-container>
+      </ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="aiNutritionAlerts.length > 0">
+      <h3 class="category-title" style="margin-top:20px;margin-bottom:10px;">🤖 AI Nutrition Advice Alerts</h3>
+      <ng-container *ngFor="let item of aiNutritionAlerts">
+        <ng-container *ngTemplateOutlet="notifCard; context: { item: item }"></ng-container>
+      </ng-container>
+    </ng-container>
+  </div>
+
+  <ng-template #notifCard let-item="item">
+    <div class="notif card" [class.unread]="!item.is_read" (click)="toggleExpanded(item)">
       <div class="row">
         <div class="title">
-          <span class="pill" [class.alert]="item.type === 'ALERT'">{{ item.type }}</span>
+          <span class="pill" [ngClass]="'priority-' + item.priorityClass">{{ item.displayType }}</span>
           <span>{{ item.title }}</span>
+          <span class="count-badge" *ngIf="item.count > 1">{{ item.count }} similar</span>
         </div>
         <div class="time muted">{{ item.created_at | date:'short' }}</div>
       </div>
@@ -60,7 +91,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </ng-template>
 
   <div class="card load-more" *ngIf="!loading && items.length > 0 && hasMore">
     <button type="button" class="btn" (click)="loadMore()" [disabled]="loadingMore">
