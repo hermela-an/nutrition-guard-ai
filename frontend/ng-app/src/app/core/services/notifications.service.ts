@@ -19,7 +19,7 @@ export class NotificationsService {
   private readonly unreadCountSubject = new BehaviorSubject<number>(0);
   readonly unreadCount$ = this.unreadCountSubject.asObservable();
 
-  constructor(private readonly api: ApiService, private readonly auth: AuthService) {}
+  constructor(private readonly api: ApiService, private readonly auth: AuthService) { }
 
   list(opts?: { unreadOnly?: boolean; limit?: number; offset?: number }): Observable<NotificationItem[]> {
     const unreadOnly = opts?.unreadOnly ? 'true' : 'false';

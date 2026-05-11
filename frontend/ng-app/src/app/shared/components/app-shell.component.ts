@@ -22,7 +22,7 @@ interface MenuItem {
   template: `
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" [routerLink]="auth.isAuthenticated() ? '/dashboard' : '/'"><span class="brand-dot"></span> NutriGuard AI</a>
+        <a class="brand" [routerLink]="homeLink"><span class="brand-dot"></span> NutriGuard AI</a>
         <nav class="menu">
           <a
             *ngFor="let item of items"
@@ -81,6 +81,13 @@ export class AppShellComponent implements OnInit, OnDestroy {
     private readonly notifications: NotificationsService,
     private readonly toast: ToastService
   ) {}
+
+  get homeLink(): string {
+    if (this.router.url.startsWith('/admin')) {
+      return '/admin/overview';
+    }
+    return this.auth.isAuthenticated() ? '/dashboard' : '/';
+  }
 
   ngOnInit(): void {
     this.sub.add(

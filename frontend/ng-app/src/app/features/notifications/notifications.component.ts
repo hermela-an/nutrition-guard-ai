@@ -1,7 +1,7 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription, timer } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, finalize } from 'rxjs/operators';
 import { AppShellComponent } from '../../shared/components/app-shell.component';
 import { NotificationsService, NotificationItem } from '../../core/services/notifications.service';
 
@@ -20,6 +20,7 @@ export interface GroupedNotification extends NotificationItem {
 })
 export class NotificationsComponent implements OnInit, OnDestroy {
   private sub = new Subscription();
+  private cdr = inject(ChangeDetectorRef);
 
   unreadOnly = true;
   loading = false;
@@ -49,7 +50,7 @@ export class NotificationsComponent implements OnInit, OnDestroy {
   healthProfileNotifs: GroupedNotification[] = [];
   aiNutritionAlerts: GroupedNotification[] = [];
 
-  constructor(public readonly notifications: NotificationsService) {}
+  constructor(public readonly notifications: NotificationsService) { }
 
   ngOnInit(): void {
     this.refresh();
@@ -119,10 +120,10 @@ export class NotificationsComponent implements OnInit, OnDestroy {
       const t = i.title?.toLowerCase() || '';
       return t.includes('chat food') || t.includes('ai advice');
     });
-    
-    this.healthProfileNotifs = grouped.filter(i => 
-      !this.mealPlanReminders.includes(i) && 
-      !this.healthRiskAlerts.includes(i) && 
+
+    this.healthProfileNotifs = grouped.filter(i =>
+      !this.mealPlanReminders.includes(i) &&
+      !this.healthRiskAlerts.includes(i) &&
       !this.aiNutritionAlerts.includes(i)
     );
   }
@@ -133,18 +134,21 @@ export class NotificationsComponent implements OnInit, OnDestroy {
     this.offset = 0;
     this.hasMore = false;
     this.expandedId = null;
-    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: 0 }).subscribe({
+    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: 0 })
+      .pipe(finalize(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      }))
+      .subscribe({
       next: (items) => {
         const nextItems = items ?? [];
         this.items = nextItems;
         this.categorizeItems(this.items);
         this.offset = nextItems.length;
         this.hasMore = nextItems.length === this.limit;
-        this.loading = false;
       },
       error: () => {
         this.errorMessage = 'Failed to load notifications. Please try again.';
-        this.loading = false;
       }
     });
   }
@@ -158,11 +162,15 @@ export class NotificationsComponent implements OnInit, OnDestroy {
   markAllRead(): void {
     this.loading = true;
     this.errorMessage = null;
-    this.notifications.markAllRead().subscribe({
+    this.notifications.markAllRead()
+      .pipe(finalize(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      }))
+      .subscribe({
       next: () => this.refresh(),
       error: () => {
         this.errorMessage = 'Failed to mark all as read. Please try again.';
-        this.loading = false;
       }
     });
   }
@@ -178,9 +186,9 @@ export class NotificationsComponent implements OnInit, OnDestroy {
         }
         item.is_read = true;
         for (const raw of this.items) {
-           if (raw.id != null && item.groupedIds.includes(raw.id)) {
-              raw.is_read = true;
-           }
+          if (raw.id != null && item.groupedIds.includes(raw.id)) {
+            raw.is_read = true;
+          }
         }
       },
       error: () => {
@@ -199,18 +207,21 @@ export class NotificationsComponent implements OnInit, OnDestroy {
     if (this.loadingMore || this.loading || !this.hasMore) return;
     this.loadingMore = true;
     this.errorMessage = null;
-    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: this.offset }).subscribe({
+    this.notifications.list({ unreadOnly: this.unreadOnly, limit: this.limit, offset: this.offset })
+      .pipe(finalize(() => {
+        this.loadingMore = false;
+        this.cdr.detectChanges();
+      }))
+      .subscribe({
       next: (items) => {
         const nextItems = items ?? [];
         this.items = [...this.items, ...nextItems];
         this.categorizeItems(this.items);
         this.offset += nextItems.length;
         this.hasMore = nextItems.length === this.limit;
-        this.loadingMore = false;
       },
       error: () => {
         this.errorMessage = 'Failed to load more notifications.';
-        this.loadingMore = false;
       }
     });
   }
