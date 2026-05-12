@@ -134,7 +134,7 @@ public class VitaminChatService {
     if (isGreeting(q)) {
       return Future.succeededFuture(withImageAndDefinition(
         new JsonObject(),
-        FALLBACK_IMAGE_URL,
+        null,
         "NutritionGuard AI is a nutrition assistant that helps explain foods and vitamins in simple terms.",
         "Hello! I am your NutriGuard AI. I can help you find vitamin information, suggest healthy meals, or track your progress!"
       ));
@@ -142,7 +142,7 @@ public class VitaminChatService {
     if (q.contains("water") || q.contains("hydration")) {
       return Future.succeededFuture(withImageAndDefinition(
         new JsonObject(),
-        FALLBACK_IMAGE_URL,
+        null,
         "Hydration is maintaining enough body water for normal function; needs vary by activity and climate.",
         "Staying hydrated is crucial! A common guideline is about 2.5-3.5 liters of total fluids per day, adjusted for activity and climate."
       ));
@@ -150,7 +150,7 @@ public class VitaminChatService {
     if (q.contains("snack") || q.contains("late night")) {
       return Future.succeededFuture(withImageAndDefinition(
         new JsonObject(),
-        FALLBACK_IMAGE_URL,
+        null,
         "A snack is a small meal between main meals; choosing protein and fiber can improve satiety.",
         "For a healthy late-night snack, try something light, like a handful of almonds, Greek yogurt, or apple slices."
       ));
@@ -158,7 +158,7 @@ public class VitaminChatService {
     if (q.contains("weight") || q.contains("lose")) {
       return Future.succeededFuture(withImageAndDefinition(
         new JsonObject(),
-        FALLBACK_IMAGE_URL,
+        null,
         "Weight management means balancing energy intake and activity over time while meeting nutrient needs.",
         "For sustainable weight management, focus on a high-protein, fiber-rich diet with an appropriate calorie balance. I can suggest healthy proteins if you want!"
       ));
@@ -187,7 +187,7 @@ public class VitaminChatService {
       return foods.search(foodQuery).compose(items -> {
         if (items != null && !items.isEmpty()) {
           JsonObject first = items.getJsonObject(0);
-          JsonObject dbResponse = buildFoodResponse(first, foodQuery);
+          JsonObject dbResponse = buildFoodResponse(first, foodQuery, true);
           boolean shouldAugment = shouldAugmentWithAi(body, question);
           if (!shouldAugment) {
             return Future.succeededFuture(dbResponse);
@@ -222,7 +222,7 @@ public class VitaminChatService {
     // 3. General Fallback -> AI mode
     return fallbackToAI(question, Future.succeededFuture(withImageAndDefinition(
       new JsonObject(),
-      FALLBACK_IMAGE_URL,
+      null,
       generateFallbackDefinition(question),
       "That is an interesting question! Could you try asking me about a specific food (for example: \"tell me about oats\") or hydration?"
     )).result());
@@ -446,7 +446,7 @@ public class VitaminChatService {
         String definition = prettyName + " is an essential nutrient found in many foods. Top sources are listed below.";
         return withImageAndDefinition(
           new JsonObject().put("name", prettyName).put("food_name", prettyName),
-          FALLBACK_IMAGE_URL,
+          null,
           definition,
           answer.toString()
         );
@@ -557,7 +557,7 @@ public class VitaminChatService {
       else if (nName.contains("cholesterol")) food.put("cholesterol_mg", value);
     }
 
-    return buildFoodResponse(food, name);
+    return buildFoodResponse(food, name, false);
   }
 
   private Future<String> callGemini(String userPrompt) {
@@ -696,7 +696,7 @@ public class VitaminChatService {
       .anyMatch(w -> w.equals("hi") || w.equals("hello") || w.equals("hey"));
   }
 
-  private JsonObject buildFoodResponse(JsonObject food, String foodQuery) {
+  private JsonObject buildFoodResponse(JsonObject food, String foodQuery, boolean isDatabaseFood) {
     String name = food == null ? null : food.getString("food_name");
     if (name == null || name.isBlank()) name = foodQuery;
 
@@ -705,7 +705,7 @@ public class VitaminChatService {
       definition = generateShortDefinition(food, name);
     }
 
-    String imageUrl = resolveImageUrl(food);
+    String imageUrl = resolveImageUrl(food, isDatabaseFood);
 
     return withImageAndDefinition(
       (food == null ? new JsonObject() : food.copy())
@@ -850,11 +850,11 @@ public class VitaminChatService {
     return String.format(java.util.Locale.US, "%.1f", value);
   }
 
-  private String resolveImageUrl(JsonObject food) {
-    if (food == null) return FALLBACK_IMAGE_URL;
+  private String resolveImageUrl(JsonObject food, boolean isDatabaseFood) {
+    if (food == null) return isDatabaseFood ? FALLBACK_IMAGE_URL : null;
     String fromDb = food.getString("image_url");
     if (fromDb != null && !fromDb.isBlank()) return fromDb;
-    return FALLBACK_IMAGE_URL;
+    return isDatabaseFood ? FALLBACK_IMAGE_URL : null;
   }
 
   private JsonObject buildNoRecordFoodResponse(String foodQuery) {
@@ -862,7 +862,7 @@ public class VitaminChatService {
     String definition = generateFallbackDefinition(name);
     return withImageAndDefinition(
       new JsonObject().put("name", name).put("food_name", name),
-      FALLBACK_IMAGE_URL,
+      null,
       definition,
       "<b>" + escapeHtml(name) + "</b><br>" + escapeHtml(definition) + "<br><br>"
       + "I couldn't find detailed nutrition for this in my sources. Please search on <a href=\"https://www.google.com/search?q=" + URLEncoder.encode(name + " nutrition", StandardCharsets.UTF_8) + "\" target=\"_blank\">Google</a> for more details."
@@ -880,14 +880,19 @@ public class VitaminChatService {
   }
 
   private JsonObject withImageAndDefinition(JsonObject base, String imageUrl, String definition, String answer) {
-    String img = (imageUrl == null || imageUrl.isBlank()) ? FALLBACK_IMAGE_URL : imageUrl;
     String def = (definition == null || definition.isBlank()) ? generateFallbackDefinition("") : definition;
 
-    return (base == null ? new JsonObject() : base)
+    JsonObject result = (base == null ? new JsonObject() : base)
       .put("definition", def)
-      .put("image_url", img)
-      .put("imageUrl", img)
       .put("answer", answer == null ? "" : answer);
+
+    if (imageUrl != null && !imageUrl.isBlank()) {
+      result.put("image_url", imageUrl).put("imageUrl", imageUrl);
+    } else {
+      result.put("image_url", "").put("imageUrl", "");
+    }
+
+    return result;
   }
 
   private Future<JsonObject> answerFromDataset(String question, String vitaminKeyRaw, int limit) {
@@ -895,7 +900,7 @@ public class VitaminChatService {
     if (vitaminKey.isEmpty()) {
       return Future.succeededFuture(withImageAndDefinition(
         new JsonObject(),
-        FALLBACK_IMAGE_URL,
+        null,
         "A vitamin is an essential micronutrient needed in small amounts to support normal body functions.",
         "I couldn't recognize that vitamin key. Please try selecting a vitamin again."
       ));
@@ -909,7 +914,7 @@ public class VitaminChatService {
           String definition = title + " is an essential micronutrient. Food sources depend on diet patterns and preparation.";
           return withImageAndDefinition(
             new JsonObject(),
-            FALLBACK_IMAGE_URL,
+            null,
             definition,
             "I don't have a list of foods for **" + title + "** right now."
           );
@@ -943,7 +948,7 @@ public class VitaminChatService {
       }
 
       String definition = "A short list of foods that contain " + title + ".";
-      return withImageAndDefinition(new JsonObject(), FALLBACK_IMAGE_URL, definition, answer.toString());
+      return withImageAndDefinition(new JsonObject(), null, definition, answer.toString());
     });
   }
 
