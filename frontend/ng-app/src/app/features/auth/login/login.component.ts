@@ -1,11 +1,13 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectorRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProfileService } from '../../../core/services/profile.service';
-import { TimeoutError } from 'rxjs';
-import { finalize, timeout } from 'rxjs/operators';
+import { TimeoutError, of } from 'rxjs';
+import { catchError, finalize, switchMap, timeout } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DestroyRef } from '@angular/core';
 
 @Component({
   standalone: true,
@@ -13,15 +15,19 @@ import { finalize, timeout } from 'rxjs/operators';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   loading = false;
   error = false;
   status = '';
+  messageType: 'success' | 'error' | 'warning' | '' = '';
   showPassword = false;
   showResend = false;
 
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
   private readonly profiles = inject(ProfileService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -29,6 +35,13 @@ export class LoginComponent {
   });
 
   constructor(public readonly auth: AuthService, private readonly router: Router) {}
+
+  ngOnInit(): void {
+    const email = this.route.snapshot.queryParamMap.get('email');
+    if (email) {
+      this.form.patchValue({ email });
+    }
+  }
 
   togglePassword(): void {
     this.showPassword = !this.showPassword;
@@ -49,60 +62,76 @@ export class LoginComponent {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.error = true;
+      this.messageType = 'error';
       this.status = 'Please enter a valid email and password (min 6 characters).';
       this.showResend = false;
       return;
     }
+
     this.loading = true;
-    this.status = 'Logging in...';
+    this.status = '';
+    this.messageType = '';
     this.error = false;
     this.showResend = false;
+
     this.auth
       .login(this.form.value.email!.trim(), this.form.value.password!)
       .pipe(
-        timeout(15_000),
-        finalize(() => (this.loading = false))
+        timeout(8_000),
+        switchMap(() => {
+          // Admin users skip profile check entirely
+          if (this.auth.isAdmin()) {
+            return of({ isAdmin: true, nextUrl: '/admin' });
+          }
+          // For regular users: fetch profile, silently fall back to setup on any error
+          return this.profiles.getProfile().pipe(
+            timeout(8_000),
+            catchError(() => of(null)),   // <-- suppresses 404/any error from console
+            switchMap(profile => {
+              const hasProfile = !!(profile && (profile as any).user_id);
+              return of({ isAdmin: false, nextUrl: hasProfile ? '/dashboard' : '/profile-setup' });
+            })
+          );
+        }),
+        finalize(() => (this.loading = false)),
+        takeUntilDestroyed(this.destroyRef)
       )
       .subscribe({
-        next: () => {
-          this.error = false;
-          this.status = 'Login successful. Checking your profile...';
-          this.showResend = false;
-
-          if (this.auth.isAdmin()) {
-            setTimeout(() => this.router.navigateByUrl('/admin'), 300);
-            return;
-          }
-
-          this.profiles
-            .getProfile()
-            .pipe(timeout(10_000))
-            .subscribe({
-              next: (profile) => {
-                const hasProfile = !!(profile && (profile as any).user_id);
-                const nextUrl = hasProfile ? '/dashboard' : '/profile-setup';
-                setTimeout(() => this.router.navigateByUrl(nextUrl), 300);
-              },
-              error: () => {
-                // If profile fetch fails, still let the user proceed to setup.
-                setTimeout(() => this.router.navigateByUrl('/profile-setup'), 300);
-              }
-            });
+        next: ({ nextUrl }) => {
+          this.router.navigateByUrl(nextUrl);
         },
         error: (err) => {
           this.error = true;
+          const raw = this.extractErrorMessage(err).toLowerCase();
+
           if (err instanceof TimeoutError) {
+            this.messageType = 'error';
             this.status = 'Request timed out. Please try again.';
           } else if (err?.status === 0) {
-            this.status = 'Cannot reach server. Please ensure backend is running.';
-          } else if (typeof err?.error === 'string' && err.error.trim()) {
-            this.status = err.error;
+            this.messageType = 'error';
+            this.status = 'Cannot reach server. Please ensure the backend is running.';
+          } else if (raw.includes('email not verified')) {
+            this.messageType = 'warning';
+            this.status = 'Your email is not verified yet. Please verify your email before logging in.';
+          } else if (raw.includes('invalid credentials')) {
+            this.messageType = 'error';
+            this.status = 'Invalid email or password.';
+          } else if (raw.includes('no account') || raw.includes('user not found') || raw.includes('email not registered')) {
+            this.messageType = 'error';
+            this.status = 'No account found with this email. Please sign up first.';
+          } else if (raw.includes('inactive')) {
+            this.messageType = 'error';
+            this.status = 'This account has been deactivated.';
+          } else if (raw.trim()) {
+            this.messageType = 'error';
+            this.status = raw;
           } else {
-            this.status = 'Login failed';
+            this.messageType = 'error';
+            this.status = 'Login failed. Please try again.';
           }
-
-          const msg = (typeof err?.error === 'string' ? err.error : '').toLowerCase();
-          this.showResend = msg.includes('email not verified');
+          this.showResend = raw.includes('email not verified');
+          this.loading = false;
+          this.cdr.detectChanges();
         }
       });
   }
@@ -112,24 +141,63 @@ export class LoginComponent {
     const email = this.form.value.email?.trim() ?? '';
     if (!email) {
       this.error = true;
+      this.messageType = 'error';
       this.status = 'Please enter your email address first.';
       return;
     }
 
     this.loading = true;
-    this.auth.resendVerification(email).subscribe({
-      next: (res) => {
-        this.error = false;
-        this.status = res?.message || 'If an account exists for that email, a verification link has been sent.';
-        this.showResend = false;
-      },
-      error: () => {
-        // Keep generic to avoid enumeration and avoid blocking the user.
-        this.error = false;
-        this.status = 'If an account exists for that email, a verification link has been sent.';
-        this.showResend = false;
-      },
-      complete: () => (this.loading = false)
-    });
+    this.auth.resendVerification(email)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => (this.loading = false))
+      )
+      .subscribe({
+        next: (res) => {
+          this.error = false;
+          this.messageType = 'success';
+          this.status = res?.message || 'If an account exists for that email, a verification link has been sent.';
+          this.showResend = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          // Keep generic to avoid account enumeration
+          this.error = false;
+          this.messageType = 'success';
+          this.status = 'If an account exists for that email, a verification link has been sent.';
+          this.showResend = false;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  /**
+   * Robustly extract the error message from an Angular HttpErrorResponse.
+   * The backend sends error bodies as plain text (no Content-Type header),
+   * so Angular may store the message in different places depending on
+   * whether JSON parsing succeeded or failed.
+   */
+  private extractErrorMessage(err: any): string {
+    // 1. err.error is a plain string (most common for text error bodies)
+    if (typeof err?.error === 'string' && err.error.trim()) {
+      return err.error.trim();
+    }
+    // 2. err.error is an object with a message property (JSON error body)
+    if (err?.error?.message && typeof err.error.message === 'string') {
+      return err.error.message.trim();
+    }
+    // 3. err.error is an object with a text property (Angular JSON parse fallback)
+    if (err?.error?.text && typeof err.error.text === 'string') {
+      return err.error.text.trim();
+    }
+    // 4. err.message (general Error or HttpErrorResponse message)
+    if (typeof err?.message === 'string' && err.message.trim()) {
+      return err.message.trim();
+    }
+    // 5. err.statusText
+    if (typeof err?.statusText === 'string' && err.statusText.trim()) {
+      return err.statusText.trim();
+    }
+    return '';
   }
 }

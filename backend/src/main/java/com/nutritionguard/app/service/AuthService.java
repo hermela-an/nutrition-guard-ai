@@ -91,7 +91,7 @@ public class AuthService {
     String normalizedEmail = normalizeEmail(email);
     return users.findByEmail(normalizedEmail).compose(existing -> {
       if (existing == null) {
-        return Future.failedFuture("Invalid credentials");
+        return Future.failedFuture("Email not registered");
       }
       if (!existing.getBoolean("is_active", true)) {
         return Future.failedFuture("Account is inactive");
@@ -161,11 +161,13 @@ public class AuthService {
     }
 
     String tokenHash = TokenUtil.sha256Hex(token.trim());
-    return verificationTokens.consumeAndVerify(tokenHash).compose(userId -> {
-      if (userId == null || userId.isBlank()) {
+    return verificationTokens.consumeAndVerify(tokenHash).compose(result -> {
+      if (result == null || result.getString("userId") == null) {
         return Future.failedFuture("Invalid or expired token");
       }
-      return Future.succeededFuture(new JsonObject().put("message", "Email verified successfully. You can now log in."));
+      return Future.succeededFuture(new JsonObject()
+        .put("message", "Email verified successfully. You can now log in.")
+        .put("email", result.getString("email")));
     });
   }
 

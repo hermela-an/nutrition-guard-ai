@@ -43,7 +43,8 @@ export class VerifyEmailComponent {
         next: (res) => {
           this.error = false;
           this.status = res?.message || 'Email verified successfully. You can now log in.';
-          setTimeout(() => this.router.navigateByUrl('/login'), 1500);
+          const navExtras = res?.email ? { queryParams: { email: res.email } } : {};
+          setTimeout(() => this.router.navigate(['/login'], navExtras), 1500);
         },
         error: (err) => {
           this.error = true;

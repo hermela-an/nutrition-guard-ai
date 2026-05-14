@@ -95,9 +95,9 @@ public class EmailVerificationTokenRepository {
 
   /**
    * Verifies the user linked to the token and deletes the token if valid.
-   * Returns the verified user id, or null if token invalid/expired.
+   * Returns a JsonObject with userId and email, or null if token invalid/expired.
    */
-  public Future<String> consumeAndVerify(String tokenHash) {
+  public Future<JsonObject> consumeAndVerify(String tokenHash) {
     String sql = """
       WITH token_row AS (
         SELECT user_id
@@ -112,7 +112,7 @@ public class EmailVerificationTokenRepository {
         FROM token_row t
         WHERE u.id = t.user_id
           AND u.is_active = true
-        RETURNING u.id AS user_id
+        RETURNING u.id AS user_id, u.email AS email
       ),
       deleted AS (
         DELETE FROM email_verification_tokens evt
@@ -120,12 +120,18 @@ public class EmailVerificationTokenRepository {
         WHERE evt.user_id = t.user_id
         RETURNING evt.user_id
       )
-      SELECT user_id FROM updated
+      SELECT user_id, email FROM updated
       """;
 
     return ensureSchema().compose(ignored ->
       db.query(sql, Tuple.of(tokenHash))
-        .map(rows -> rows.iterator().hasNext() ? rows.iterator().next().getString("user_id") : null)
+        .map(rows -> {
+          if (!rows.iterator().hasNext()) return null;
+          Row row = rows.iterator().next();
+          return new JsonObject()
+            .put("userId", row.getString("user_id"))
+            .put("email", row.getString("email"));
+        })
     );
   }
 }

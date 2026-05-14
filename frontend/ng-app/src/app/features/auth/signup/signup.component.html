@@ -43,9 +43,31 @@
             <small class="error" *ngIf="showError('password', 'required')">Password is required.</small>
             <small class="error" *ngIf="showError('password', 'minlength')">Password must be at least 6 characters.</small>
           </div>
-          <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">Create Account</button>
+          <button class="btn primary" [disabled]="loading || form.invalid" type="submit" style="width:100%; margin-top:8px;">
+          <span *ngIf="loading" class="spinner" aria-hidden="true"></span>
+          {{ loading ? 'Creating account...' : 'Create Account' }}
+        </button>
         </form>
-        <div *ngIf="status" class="status" [class.ok]="!error" [class.err]="error">{{ status }}</div>
+
+        <div *ngIf="status" class="auth-alert" [class.alert-success]="messageType === 'success'" [class.alert-warning]="messageType === 'warning'" [class.alert-error]="messageType === 'error'" role="alert">
+          <span class="alert-icon">
+            <svg *ngIf="messageType === 'success'" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/><path d="m6 10 3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg *ngIf="messageType === 'warning'" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><path d="M9.13 3.23a1 1 0 0 1 1.74 0l6.54 11.34A1 1 0 0 1 16.54 16H3.46a1 1 0 0 1-.87-1.43Z" stroke="currentColor" stroke-width="1.8"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="13.5" r=".75" fill="currentColor"/></svg>
+            <svg *ngIf="messageType === 'error'" viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/><path d="m7 7 6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="alert-text">{{ status }}</span>
+        </div>
+
+        <button
+          *ngIf="showResend"
+          class="btn secondary"
+          type="button"
+          (click)="resendVerification()"
+          [disabled]="loading"
+          style="width:100%; margin-top:10px;">
+          Resend verification email
+        </button>
+
         <p style="margin-top:12px; color:var(--muted);">Already have an account? <a routerLink="/login" style="color:var(--brand); font-weight:700;">Login</a></p>
       </div>
     </section>

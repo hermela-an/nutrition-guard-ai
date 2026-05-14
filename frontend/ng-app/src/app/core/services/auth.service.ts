@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpHeaders } from '@angular/common/http';
 import { map, tap } from 'rxjs/operators';
 import { ApiService } from './api.service';
@@ -16,6 +16,7 @@ export interface RegisterResponse {
 
 export interface VerifyEmailResponse {
   message: string;
+  email?: string;
 }
 
 @Injectable({ providedIn: 'root' })
