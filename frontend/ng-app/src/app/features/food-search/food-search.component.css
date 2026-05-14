@@ -243,17 +243,19 @@
     }
 
     .macro-strip {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin-top: 10px;
     }
 
     .macro-chip {
+      flex: 1 1 0%;
+      min-width: max-content;
       background: #f4f7f3;
       border: 1px solid #e7efe3;
       border-radius: 10px;
-      padding: 8px 10px;
+      padding: 8px 12px;
       display: flex;
       justify-content: space-between;
       align-items: baseline;
@@ -356,7 +358,7 @@
 
     @media (max-width: 420px) {
       .macro-strip {
-        grid-template-columns: 1fr;
+        flex-direction: column;
       }
     }
   
