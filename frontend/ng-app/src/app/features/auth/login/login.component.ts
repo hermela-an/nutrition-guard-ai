@@ -1,7 +1,7 @@
-import { Component, inject, ChangeDetectorRef, OnInit } from '@angular/core';
+import { Component, inject, ChangeDetectorRef, ElementRef, OnInit, AfterViewInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProfileService } from '../../../core/services/profile.service';
 import { TimeoutError, of } from 'rxjs';
@@ -15,7 +15,10 @@ import { DestroyRef } from '@angular/core';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css']
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, AfterViewInit {
+  @ViewChild('emailInput') private readonly emailInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('passwordInput') private readonly passwordInput!: ElementRef<HTMLInputElement>;
+
   loading = false;
   error = false;
   status = '';
@@ -24,7 +27,6 @@ export class LoginComponent implements OnInit {
   showResend = false;
 
   private readonly fb = inject(FormBuilder);
-  private readonly route = inject(ActivatedRoute);
   private readonly profiles = inject(ProfileService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -37,10 +39,17 @@ export class LoginComponent implements OnInit {
   constructor(public readonly auth: AuthService, private readonly router: Router) {}
 
   ngOnInit(): void {
-    const email = this.route.snapshot.queryParamMap.get('email');
-    if (email) {
-      this.form.patchValue({ email });
-    }
+    // Login page always loads with empty fields.
+    // Only browser autofill suggestions should be available, not automatic page-load filling.
+  }
+
+  ngAfterViewInit(): void {
+    setTimeout(() => {
+      this.form.reset({ email: '', password: '' }, { emitEvent: false });
+      this.emailInput.nativeElement.value = '';
+      this.passwordInput.nativeElement.value = '';
+      this.cdr.detectChanges();
+    }, 0);
   }
 
   togglePassword(): void {

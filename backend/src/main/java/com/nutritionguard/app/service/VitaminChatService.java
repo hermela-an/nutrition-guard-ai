@@ -22,82 +22,43 @@ public class VitaminChatService {
   private final WebClient webClient;
   private final Function<String, Future<String>> aiCaller;
 
+  private boolean lastMessageWasNutrition = false;
+  private String lastNutritionQuestion = "";
+
   private static final int GEMINI_TIMEOUT_MS = 15_000;
-  private static final String GEMINI_MODEL = "gemini-1.5-flash";
-  private static final String GEMINI_ENDPOINT =
-    "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent";
   private static final String USDA_ENDPOINT = "https://api.nal.usda.gov/fdc/v1/foods/search";
 
   private static final String SYSTEM_PROMPT = """
-    NutritionGuard AI – Flexible Hybrid Prompt
+    Nutrition Expert AI
 
-    You are the NutritionGuard AI chatbot. You use a hybrid system (database + AI) to answer all user questions.
+    You are a professional nutrition expert and food knowledge assistant.
 
-    🧠 1. Database First (Primary Source)
+    You only answer questions related to:
+    * food
+    * nutrition
+    * calories
+    * vitamins
+    * minerals
+    * diet
+    * healthy eating
+    * cooking ingredients
+    * food preparation
 
-    When the user asks about food, nutrition, or ingredients:
+    Rules:
+    1. Provide clear, accurate, and helpful nutrition information.
+    2. When nutrition data is provided, explain its health meaning.
+    3. Suggest healthy food alternatives when appropriate.
+    4. Keep answers concise and easy to understand.
+    5. If the question is unrelated to nutrition, respond with:
+       'I specialize only in nutrition and food-related questions.'
 
-    First check the database for matching information.
-    If data exists:
-    Use database values (calories, protein, carbs, fats, vitamins, minerals).
-    Do NOT change or guess these values.
-    🤖 2. AI Fallback (If database is missing or incomplete)
+    Format your answers naturally using standard HTML tags such as <b>, <br>, <ul>, <li>. Limit your response to 200 words.
 
-    If:
-
-    the food is NOT in the database, OR
-    the question is about cooking, explanation, health advice, or general knowledge
-
-    👉 Use AI knowledge to provide a helpful, correct, and complete answer.
-
-    🔄 3. Combined Mode (Best behavior)
-
-    If both exist:
-
-    Use database for factual nutrition data
-    Use AI for:
-    cooking instructions
-    explanations
-    health insights
-    practical advice
-    ⚠️ 4. No Blocking Rule (VERY IMPORTANT)
-
-    Do NOT reject or block questions.
-
-    Even if:
-
-    data is missing
-    question is general
-    question is cooking-related
-
-    👉 Always respond using AI when database is not enough.
-
-    Never say:
-
-    “this is only nutrition data” ❌
-    “depends on database” ❌
-
-    Instead:
-    👉 always provide a helpful answer.
-
-    🎯 Goal
-
-    Provide:
-
-    accurate nutrition from database when available
-    intelligent AI responses when not available
-    seamless experience without restrictions or missing answers
-    🧠 Final Behavior Rule
-
-    Always do this order:
-
-    Check database
-    If found → use it
-    If not found or needs explanation → use AI
-    Combine both when needed
-    Always respond fully (no empty or blocked answers)
-
-    Please format your answers nicely using standard HTML tags such as <b>, <br>, <ul>, <li>. Limit your response to 200 words.
+    Example format:
+    <b>Nutrition Insight:</b><br>
+    Explain what the nutrients mean for health.<br><br>
+    <b>Optional Tip:</b><br>
+    Add a short healthy eating suggestion or cooking idea.
     """;
 
   private static final String FALLBACK_IMAGE_URL =
@@ -116,7 +77,7 @@ public class VitaminChatService {
     this.foods = foods;
     this.config = config;
     this.webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true).setTrustAll(true));
-    this.aiCaller = aiCaller == null ? this::callGemini : aiCaller;
+    this.aiCaller = aiCaller == null ? this::callGeminiWithFallback : aiCaller;
   }
 
   public Future<JsonObject> ask(JsonObject body) {
@@ -130,6 +91,37 @@ public class VitaminChatService {
 
     String q = question == null ? "" : question.toLowerCase();
 
+    boolean isNutrition = isNutritionDomain(q);
+    boolean isFollowUp = false;
+
+    // 0. Domain Restriction
+    if (isNutrition) {
+      lastMessageWasNutrition = true;
+      lastNutritionQuestion = question;
+    } else if (lastMessageWasNutrition) {
+      isFollowUp = true;
+      lastMessageWasNutrition = false; // Reset context
+    } else {
+      lastMessageWasNutrition = false;
+      return Future.succeededFuture(withImageAndDefinition(
+        new JsonObject(),
+        null,
+        "NutritionGuard AI Assistant",
+        "I'm a nutrition assistant and can only answer questions related to food, diet, and nutrients.\n" +
+        "Please ask questions about nutrition, healthy eating, vitamins, calories, or recipes."
+      ));
+    }
+
+    final String finalQuestion;
+    if (isFollowUp) {
+      finalQuestion = "The user previously asked about " + lastNutritionQuestion + ". The user now says: '" + question + "'. Continue the nutrition discussion and provide more helpful information.";
+      return fallbackToAI(finalQuestion, Future.succeededFuture(withImageAndDefinition(
+        new JsonObject(), null, "Nutrition Follow-up", "I couldn't generate an AI response. Please check your Gemini API key or try asking a more specific nutrition question."
+      )).result());
+    } else {
+      finalQuestion = question;
+    }
+
     // 1. Conversational logic
     if (isGreeting(q)) {
       return Future.succeededFuture(withImageAndDefinition(
@@ -139,41 +131,43 @@ public class VitaminChatService {
         "Hello! I am your NutriGuard AI. I can help you find vitamin information, suggest healthy meals, or track your progress!"
       ));
     }
-    if (q.contains("water") || q.contains("hydration")) {
-      return Future.succeededFuture(withImageAndDefinition(
-        new JsonObject(),
-        null,
-        "Hydration is maintaining enough body water for normal function; needs vary by activity and climate.",
-        "Staying hydrated is crucial! A common guideline is about 2.5-3.5 liters of total fluids per day, adjusted for activity and climate."
-      ));
-    }
-    if (q.contains("snack") || q.contains("late night")) {
-      return Future.succeededFuture(withImageAndDefinition(
-        new JsonObject(),
-        null,
-        "A snack is a small meal between main meals; choosing protein and fiber can improve satiety.",
-        "For a healthy late-night snack, try something light, like a handful of almonds, Greek yogurt, or apple slices."
-      ));
-    }
-    if (q.contains("weight") || q.contains("lose")) {
-      return Future.succeededFuture(withImageAndDefinition(
-        new JsonObject(),
-        null,
-        "Weight management means balancing energy intake and activity over time while meeting nutrient needs.",
-        "For sustainable weight management, focus on a high-protein, fiber-rich diet with an appropriate calorie balance. I can suggest healthy proteins if you want!"
-      ));
-    }
+
 
     // 2a. Nutrient / Vitamin query detection (before food search)
     String nutrientName = detectNutrientQuery(q);
     if (!nutrientName.isEmpty()) {
+      // Step 1: try vitamins JSONB (vitamins + mapped minerals)
       String vitaminDbKey = nutrientToVitaminKey(nutrientName);
       if (!vitaminDbKey.isEmpty()) {
-        return answerFromDataset(question, vitaminDbKey, 10)
+        return answerFromDataset(finalQuestion, vitaminDbKey, 10)
           .compose(dbResult -> {
             String dbAnswer = dbResult.getString("answer", "");
             if (!dbAnswer.isBlank() && !dbAnswer.contains("I don't have")) {
               return Future.succeededFuture(dbResult);
+            }
+            // Step 2: try DB column (e.g. fiber_g, sodium_mg, cholesterol_mg)
+            String dbColumn = nutrientToDbColumn(nutrientName);
+            if (!dbColumn.isEmpty()) {
+              return answerFromDbColumn(finalQuestion, nutrientName, dbColumn, 10)
+                .compose(colResult -> {
+                  String colAnswer = colResult.getString("answer", "");
+                  if (!colAnswer.isBlank() && !colAnswer.contains("I don't have")) {
+                    return Future.succeededFuture(colResult);
+                  }
+                  return callUsdaForNutrient(nutrientName);
+                });
+            }
+            return callUsdaForNutrient(nutrientName);
+          });
+      }
+      // Step 2 (no JSONB key): try DB column before USDA
+      String dbColumn = nutrientToDbColumn(nutrientName);
+      if (!dbColumn.isEmpty()) {
+        return answerFromDbColumn(finalQuestion, nutrientName, dbColumn, 10)
+          .compose(colResult -> {
+            String colAnswer = colResult.getString("answer", "");
+            if (!colAnswer.isBlank() && !colAnswer.contains("I don't have")) {
+              return Future.succeededFuture(colResult);
             }
             return callUsdaForNutrient(nutrientName);
           });
@@ -188,13 +182,13 @@ public class VitaminChatService {
         if (items != null && !items.isEmpty()) {
           JsonObject first = items.getJsonObject(0);
           JsonObject dbResponse = buildFoodResponse(first, foodQuery, true);
-          boolean shouldAugment = shouldAugmentWithAi(body, question);
+          boolean shouldAugment = shouldAugmentWithAi(body, finalQuestion);
           if (!shouldAugment) {
             return Future.succeededFuture(dbResponse);
           }
 
           String prompt =
-            "User asked: " + question + "\n\n"
+            "User asked: " + finalQuestion + "\n\n"
               + "Database facts (do not alter numbers): " + first.encode() + "\n\n"
               + "Provide a short explanation and practical advice. Do not repeat nutrition numbers; those are already shown to the user.";
 
@@ -213,17 +207,17 @@ public class VitaminChatService {
               return Future.succeededFuture(usdaResponse);
             }
             // AI Fallback (Gemini)
-            return fallbackToAI(question, buildNoRecordFoodResponse(foodQuery));
+            return fallbackToAI(finalQuestion, buildNoRecordFoodResponse(foodQuery));
           });
         }
       });
     }
 
     // 3. General Fallback -> AI mode
-    return fallbackToAI(question, Future.succeededFuture(withImageAndDefinition(
+    return fallbackToAI(finalQuestion, Future.succeededFuture(withImageAndDefinition(
       new JsonObject(),
       null,
-      generateFallbackDefinition(question),
+      generateFallbackDefinition(finalQuestion),
       "That is an interesting question! Could you try asking me about a specific food (for example: \"tell me about oats\") or hydration?"
     )).result());
   }
@@ -254,6 +248,37 @@ public class VitaminChatService {
        System.err.println("Gemini API error: " + err.getMessage());
        return Future.succeededFuture(defaultResponse);
     });
+  }
+
+  private boolean isNutritionDomain(String q) {
+    if (q == null || q.isBlank()) return false;
+    String lower = q.toLowerCase(Locale.ROOT);
+    if (isGreeting(lower)) return true;
+    if (isNutritionFactsQuestion(lower)) return true;
+    if (isCookingQuestion(lower)) return true;
+    if (!detectNutrientQuery(lower).isEmpty()) return true;
+
+    String[] keywords = {
+      "food", "nutrition", "calorie", "protein", "carbohydrate", "carb", "fat",
+      "vitamin", "mineral", "diet", "healthy", "weight", "ingredient", "recipe",
+      "cook", "benefit"
+    };
+    for (String kw : keywords) {
+      if (lower.contains(kw)) return true;
+    }
+
+    // Treat short plain queries as potential food-name lookups (e.g. "injera", "teff bread").
+    // extractFoodQuery uses the same logic; returning true here lets the DB search run.
+    String cleaned = lower.replaceAll("[^a-z\\s]", " ").replaceAll("\\s+", " ").trim();
+    String[] words = cleaned.split("\\s+");
+    if (words.length >= 1 && words.length <= 5
+        && !cleaned.isEmpty()
+        && !isGreeting(cleaned)
+        && !containsFoodStopWords(words)) {
+      return true;
+    }
+
+    return false;
   }
 
   private boolean shouldAugmentWithAi(JsonObject body, String question) {
@@ -503,8 +528,73 @@ public class VitaminChatService {
       case "vitamin b6" -> "vitamin_b6";
       case "folate" -> "vitamin_b9";
       case "vitamin b12" -> "vitamin_b12";
+      // Minerals — look them up in the vitamins JSONB column first
+      case "iron" -> "iron";
+      case "calcium" -> "calcium";
+      case "magnesium" -> "magnesium";
+      case "potassium" -> "potassium";
+      case "zinc" -> "zinc";
+      case "phosphorus" -> "phosphorus";
+      case "omega 3" -> "omega_3";
       default -> "";
     };
+  }
+
+  /**
+   * Maps a nutrient name to a dedicated DB column when the nutrient
+   * is stored as a first-class column rather than inside vitamins JSONB.
+   */
+  private String nutrientToDbColumn(String nutrientName) {
+    return switch (nutrientName.toLowerCase()) {
+      case "fiber", "dietary fiber", "fibre" -> "fiber_g";
+      case "sodium", "salt" -> "sodium_mg";
+      case "cholesterol" -> "cholesterol_mg";
+      case "protein" -> "protein_g";
+      default -> "";
+    };
+  }
+
+  private Future<JsonObject> answerFromDbColumn(
+      String question, String nutrientName, String column, int limit) {
+    return foods.findFoodsRichInColumn(column, limit).map(items -> {
+      String prettyName = Character.toUpperCase(nutrientName.charAt(0)) + nutrientName.substring(1);
+      if (items == null || items.isEmpty()) {
+        String def = prettyName + " is an essential nutrient found in many foods.";
+        return withImageAndDefinition(
+          new JsonObject().put("name", prettyName).put("food_name", prettyName),
+          null,
+          def,
+          "I don't have " + escapeHtml(prettyName) + " data in the database right now."
+        );
+      }
+      StringBuilder answer = new StringBuilder();
+      answer.append("<b>Foods rich in ").append(escapeHtml(prettyName)).append("</b><br><ul>");
+      for (int i = 0; i < items.size(); i++) {
+        JsonObject item = items.getJsonObject(i);
+        if (item == null) continue;
+        String name = item.getString("food_name", "Food");
+        String value = item.getString("nutrient_value", "");
+        answer.append("<li>").append(escapeHtml(name));
+        if (!value.isBlank()) answer.append(" &mdash; ").append(escapeHtml(value));
+        answer.append("</li>");
+      }
+      answer.append("</ul>");
+      if (question != null && !question.isBlank()) {
+        answer.append("<br>Question: ").append(escapeHtml(question));
+      }
+      String definition = "Top foods by " + prettyName + " content, sourced from your database.";
+      return withImageAndDefinition(
+        new JsonObject().put("name", prettyName).put("food_name", prettyName),
+        null, definition, answer.toString()
+      );
+    }).recover(err -> {
+      System.err.println("DB column nutrient search error: " + err.getMessage());
+      return Future.succeededFuture(withImageAndDefinition(
+        new JsonObject(), null,
+        nutrientName + " is an essential nutrient.",
+        "I don't have " + escapeHtml(nutrientName) + " data right now."
+      ));
+    });
   }
 
   private Future<JsonObject> callUsda(String foodQuery) {
@@ -560,12 +650,27 @@ public class VitaminChatService {
     return buildFoodResponse(food, name, false);
   }
 
-  private Future<String> callGemini(String userPrompt) {
+  private Future<String> callGeminiWithFallback(String prompt) {
+    return callGemini("gemini-1.5-flash", prompt)
+      .recover(err -> {
+        System.out.println("Primary model failed, switching to backup...");
+        return callGemini("gemini-1.0-flash", prompt);
+      })
+      .recover(err -> {
+        System.out.println("Backup model failed, using safe fallback...");
+        return Future.succeededFuture(
+          "I'm currently experiencing high demand. Please try again shortly, or ask about specific foods or nutrients."
+        );
+      });
+  }
+
+  private Future<String> callGemini(String model, String userPrompt) {
     String apiKey = config.geminiApiKey();
     if (apiKey == null || apiKey.isBlank()) {
       return Future.failedFuture("Missing GEMINI_API_KEY");
     }
 
+    String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
     String prompt = userPrompt == null ? "" : userPrompt;
 
     JsonObject requestBody = new JsonObject()
@@ -583,7 +688,7 @@ public class VitaminChatService {
       );
 
     return webClient
-      .postAbs(GEMINI_ENDPOINT)
+      .postAbs(endpoint)
       .timeout(GEMINI_TIMEOUT_MS)
       .putHeader("Content-Type", "application/json")
       .putHeader("x-goog-api-key", apiKey.trim())
@@ -596,7 +701,7 @@ public class VitaminChatService {
         // Some environments expect API keys via query string rather than header.
         String encodedKey = URLEncoder.encode(apiKey.trim(), StandardCharsets.UTF_8);
         return webClient
-          .postAbs(GEMINI_ENDPOINT + "?key=" + encodedKey)
+          .postAbs(endpoint + "?key=" + encodedKey)
           .timeout(GEMINI_TIMEOUT_MS)
           .putHeader("Content-Type", "application/json")
           .sendJsonObject(requestBody);
@@ -865,7 +970,7 @@ public class VitaminChatService {
       null,
       definition,
       "<b>" + escapeHtml(name) + "</b><br>" + escapeHtml(definition) + "<br><br>"
-      + "I couldn't find detailed nutrition for this in my sources. Please search on <a href=\"https://www.google.com/search?q=" + URLEncoder.encode(name + " nutrition", StandardCharsets.UTF_8) + "\" target=\"_blank\">Google</a> for more details."
+      + "I don't have exact nutrition facts for this item. Please ask me about its general health benefits or how to cook it!"
     );
   }
 

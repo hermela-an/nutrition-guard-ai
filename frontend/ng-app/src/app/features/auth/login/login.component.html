@@ -8,17 +8,17 @@
     <div class="auth-form">
       <h2>Login</h2>
       <p class="lead">Secure access to your profile.</p>
-      <form [formGroup]="form" (ngSubmit)="submit()">
+      <form [formGroup]="form" (ngSubmit)="submit()" autocomplete="off">
         <div class="field">
           <label>Email</label>
-          <input class="input auth-credential" [class.invalid]="isInvalid('email')" formControlName="email" type="email" autocomplete="email" placeholder="you@example.com">
+          <input #emailInput class="input auth-credential" [class.invalid]="isInvalid('email')" formControlName="email" name="email" type="email" autocomplete="email" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="you@example.com">
           <small class="error" *ngIf="showError('email', 'required')">Email is required.</small>
           <small class="error" *ngIf="showError('email', 'email')">Invalid email format.</small>
         </div>
         <div class="field">
           <label>Password</label>
           <div class="spaced" style="align-items:stretch;">
-            <input class="input auth-credential" [class.invalid]="isInvalid('password')" formControlName="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="********">
+            <input #passwordInput class="input auth-credential" [class.invalid]="isInvalid('password')" formControlName="password" name="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="********">
             <button
               class="icon-btn"
               type="button"

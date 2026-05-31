@@ -49,15 +49,6 @@ public class PasswordResetMailer {
       System.err.println("SMTP is configured but SMTP_PASSWORD is empty; password-reset emails will fail to send.");
     }
 
-    System.out.printf(
-      "SMTP configured: host=%s port=%d starttls=%s from=%s auth=%s%n",
-      host,
-      port,
-      startTls,
-      isBlank(config.smtpFrom()) ? "(default)" : config.smtpFrom().trim(),
-      isBlank(config.smtpUsername()) ? "none" : "username"
-    );
-
     this.client = MailClient.createShared(vertx, mailConfig);
   }
 

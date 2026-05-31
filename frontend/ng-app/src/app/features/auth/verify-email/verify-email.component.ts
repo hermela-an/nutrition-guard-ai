@@ -43,8 +43,8 @@ export class VerifyEmailComponent {
         next: (res) => {
           this.error = false;
           this.status = res?.message || 'Email verified successfully. You can now log in.';
-          const navExtras = res?.email ? { queryParams: { email: res.email } } : {};
-          setTimeout(() => this.router.navigate(['/login'], navExtras), 1500);
+          // Redirect to login without pre-filling email - login page always loads empty
+          setTimeout(() => this.router.navigate(['/login']), 1500);
         },
         error: (err) => {
           this.error = true;

@@ -35,6 +35,11 @@ public class VitaminChatServiceTest {
     public Future<JsonArray> vitaminLeaderboard(String vitaminKey, int limit) {
       return Future.succeededFuture(new JsonArray());
     }
+
+    @Override
+    public Future<JsonArray> findFoodsRichInColumn(String columnName, int limit) {
+      return Future.succeededFuture(new JsonArray());
+    }
   }
 
   private static AppConfig withGeminiKey(AppConfig base, String key) {
@@ -56,7 +61,9 @@ public class VitaminChatServiceTest {
       base.smtpUsername(),
       base.smtpPassword(),
       base.smtpFrom(),
-      key
+      key,                    // geminiApiKey
+      base.usdaApiKey(),      // usdaApiKey
+      base.remoteSyncUrl()    // remoteSyncUrl
     );
   }
 

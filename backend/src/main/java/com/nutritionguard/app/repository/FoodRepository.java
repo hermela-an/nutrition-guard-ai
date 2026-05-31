@@ -983,6 +983,57 @@ public class FoodRepository {
     return db.query(sql, Tuple.tuple()).map(this::rowsToFoods);
   }
 
+  /**
+   * Returns foods ordered descending by a specific nutritional column.
+   * The column name is validated against a strict whitelist to prevent SQL injection.
+   */
+  public Future<JsonArray> findFoodsRichInColumn(String columnName, int limit) {
+    int safeLimit = Math.max(1, Math.min(limit, 50));
+
+    // Strict whitelist — only known numeric columns are allowed
+    String col = switch (columnName) {
+      case "fiber_g"        -> "fiber_g";
+      case "sodium_mg"      -> "sodium_mg";
+      case "cholesterol_mg" -> "cholesterol_mg";
+      case "protein_g"      -> "protein_g";
+      default               -> null;
+    };
+
+    if (col == null) {
+      return Future.succeededFuture(new JsonArray());
+    }
+
+    String unit = col.endsWith("_mg") ? " mg" : " g";
+
+    String sql =
+      "SELECT id, food_name, (" + col + ")::double precision AS nutrient_val " +
+      "FROM food_items " +
+      "WHERE is_deleted = false " +
+      "  AND " + col + " IS NOT NULL " +
+      "  AND (" + col + ")::double precision > 0 " +
+      "ORDER BY (" + col + ")::double precision DESC " +
+      "LIMIT $1";
+
+    return db.query(sql, Tuple.of(safeLimit))
+      .map(rows -> {
+        JsonArray items = new JsonArray();
+        for (Row row : rows) {
+          Double val = row.getDouble("nutrient_val");
+          String valueStr = val != null ? String.format("%.1f%s", val, unit) : "";
+          items.add(new JsonObject()
+            .put("id", row.getInteger("id"))
+            .put("food_name", row.getString("food_name"))
+            .put("nutrient_value", valueStr)
+          );
+        }
+        return items;
+      })
+      .recover(err -> {
+        System.err.println("findFoodsRichInColumn error [" + col + "]: " + err.getMessage());
+        return Future.succeededFuture(new JsonArray());
+      });
+  }
+
   public Future<Integer> markSynced() {
     String sql = "UPDATE food_items SET needs_sync = false WHERE needs_sync = true";
     return db.query(sql, Tuple.tuple()).map(rows -> rows.rowCount());
