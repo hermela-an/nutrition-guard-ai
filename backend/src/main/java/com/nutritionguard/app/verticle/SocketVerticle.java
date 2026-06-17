@@ -2,6 +2,7 @@ package com.nutritionguard.app.verticle;
 
 import com.nutritionguard.app.db.Database;
 import com.nutritionguard.app.repository.FoodRepository;
+import com.nutritionguard.app.service.RagService;
 import com.nutritionguard.app.service.VitaminChatService;
 import com.nutritionguard.app.util.EventAddresses;
 import com.nutritionguard.app.config.AppConfig;
@@ -19,7 +20,8 @@ public class SocketVerticle extends AbstractVerticle {
 
   @Override
   public void start() {
-    VitaminChatService service = new VitaminChatService(vertx, config, new FoodRepository(db));
+    RagService ragService = new RagService(vertx, config.ragApiUrl());
+    VitaminChatService service = new VitaminChatService(vertx, config, new FoodRepository(db), ragService);
     vertx.eventBus().consumer(EventAddresses.CHAT_ASK, msg -> {
       JsonObject body = (JsonObject) msg.body();
       service.ask(body)
