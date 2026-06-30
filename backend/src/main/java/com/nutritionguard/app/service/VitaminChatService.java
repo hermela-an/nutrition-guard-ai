@@ -40,213 +40,13 @@ public class VitaminChatService {
   private static final int GEMINI_TIMEOUT_MS = 15_000;
   private static final String USDA_ENDPOINT = "https://api.nal.usda.gov/fdc/v1/foods/search";
   private static final Set<String> VALID_INTENTS = Set.of(); // placeholder, intents removed
-  private static final String SYSTEM_PROMPT = "You are a helpful nutrition assistant. Provide concise, accurate answers based on the provided context.";
-    // Removed intentHandlerMap and related initialization (no longer needed)
+  private static final String SYSTEM_PROMPT = "You are a helpful, polite nutrition assistant named NutriGuard AI. " +
+            "You are allowed to engage in basic conversational pleasantries, such as greetings, farewells, saying 'you're welcome', and introducing yourself. " +
+            "However, you MUST strictly refuse to answer questions about unrelated general knowledge topics (such as programming, history, politics, weather, math, or general trivia). " +
+            "If asked about an unrelated general knowledge topic, you MUST reply with exactly: 'I am a nutritional assistant and only answer food-related or descriptive nutrition questions.'";
 
-    // Helper method to extract the best search term from RetrievalQuery
-    private String extractBestSearchTerm(RetrievalQuery rq) {
-        // Prefer explicit search terms if present
-        List<String> terms = rq.getUnderstanding().getSearchTerms();
-        if (terms != null && !terms.isEmpty()) {
-            return String.join(" ", terms);
-        }
-        // Fall back to food items from search context
-        List<String> foods = rq.getUnderstanding().getSearchContext().getFoods();
-        if (foods != null && !foods.isEmpty()) {
-            return foods.get(0);
-        }
-        // As last resort, use the original question
-        return rq.getOriginalQuestion();
-    }
-
-
-        // Helper method to clean up the query if the NLU fails to extract the food name
-    private String cleanFallbackQuery(String originalQuestion) {
-        if (originalQuestion == null) return "";
-        String q = originalQuestion.toLowerCase().trim();
-        
-        // Remove common question prefixes
-        q = q.replaceAll("^(what is the |what's the |how many |tell me the |give me the |can you tell me the )", "");
-        
-        // Remove "noise" phrases that confuse the database
-        q = q.replaceAll("(nutritional value of|nutrition value of|nutritional info of|nutritional information for|calories in|nutrients in|about|for|in|of)\\s+", "");
-        
-        // Remove trailing punctuation (like ? or !)
-        q = q.replaceAll("[\\?\\!\\.]$", "").trim();
-        
-        // Remove starting articles (a, an, the)
-        q = q.replaceAll("^(a |an |the )", "");
-        
-        return q.trim();
-    }
-
-        // 🚑 THE RESCUE SAFETY NET
-    // If the main NLU fails to find a food, we ask the AI one simple question:
-    // "Is there a food name in this sentence?"
-    private Future<String> rescueExtractFoodName(String question) {
-        String rescuePrompt = "You are a strict food entity extractor. Read the following user question and extract the exact name of the food or dish mentioned. " +
-                "If the user is asking a general question without mentioning a specific food, reply with exactly the word 'NONE'. " +
-                "Do not explain. Output ONLY the food name or 'NONE'.\n\n" +
-                "Question: \"" + question + "\"\n" +
-                "Food name:";
-                
-        return aiCaller.apply(rescuePrompt).map(response -> {
-            String cleaned = response.trim().toLowerCase();
-            // If the AI says NONE, or if it returns garbage, we return null
-            if (cleaned.contains("none") || cleaned.isEmpty() || cleaned.length() > 50) {
-                return null; 
-            }
-            // Clean up any punctuation the AI might have added
-            return cleaned.replaceAll("[^a-z0-9\\s]", "").trim();
-        }).recover(err -> {
-            System.out.println("🚑 Rescue AI call failed: " + err.getMessage());
-            return Future.succeededFuture(null);
-        });
-    }
-       private Future<JsonObject> retrieveLocal(RetrievalQuery rq) {
-        // 1. Get the extracted foods from the main NLU
-        List<String> extractedFoods = rq.getUnderstanding().getSearchContext().getFoods();
-        
-        // 2. If the NLU found a food, search the DB immediately!
-        if (extractedFoods != null && !extractedFoods.isEmpty()) {
-            String query = String.join(" ", extractedFoods);
-            System.out.println("🔍 LOCAL DB SEARCH - Query sent to DB: " + query);
-            
-            return foods.search(query).map(items -> {
-                if (items == null || items.isEmpty()) return null;
-                JsonArray limited = new JsonArray();
-                for (int i = 0; i < Math.min(3, items.size()); i++) {
-                    limited.add(items.getJsonObject(i));
-                }
-                System.out.println("🔍 LOCAL DB RESULT - Found " + limited.size() + " items.");
-                return new JsonObject().put("items", limited);
-            });
-        }
-
-        // 3. 🚑 RESCUE TRIGGERED: The NLU failed to find a food.
-        System.out.println("⚠️ NLU found no foods. Triggering Rescue Extraction...");
-        
-        return rescueExtractFoodName(rq.getOriginalQuestion()).compose(rescuedFood -> {
-            if (rescuedFood == null) {
-                System.out.println("🛑 Rescue failed (User likely didn't mention a food). Skipping Local DB.");
-                return Future.succeededFuture(null);
-            }
-            
-            System.out.println("🚑 Rescue SUCCESS! Found food: " + rescuedFood);
-            
-            // Now search the DB with the rescued food name!
-            return foods.search(rescuedFood).map(items -> {
-                if (items == null || items.isEmpty()) return null;
-                JsonArray limited = new JsonArray();
-                for (int i = 0; i < Math.min(3, items.size()); i++) {
-                    limited.add(items.getJsonObject(i));
-                }
-                return new JsonObject().put("items", limited);
-            });
-        });
-    }
-
-    
-
-
-    private JsonObject aggregateContexts(JsonObject... contexts) {
-        JsonObject agg = new JsonObject();
-        for (JsonObject ctx : contexts) {
-            String source = ctx.getString("source");
-            JsonObject data = ctx.getJsonObject("data");
-            if (source != null && data != null) {
-                agg.put(source, data);
-            }
-        }
-        return agg;
-    }
-
-    private Future<String> queryRagWithContext(RetrievalQuery rq) {
-        // Build prompt using only the user's question and extracted search terms.
-        String ragPrompt = "User original question: " + rq.getOriginalQuestion() + "\nSearch terms: " + String.join(" ", rq.getUnderstanding().getSearchTerms());
-
-         //logger.info("📚 RAG SEARCH - Prompt sent to RAG:\n{}", ragPrompt);
-         System.out.println("📚 RAG SEARCH - Prompt sent to RAG:\n" + ragPrompt);
-        return ragService.query(ragPrompt);
-    }
-        private Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage) {
-        String ragAnswer = masterPackage.getString("rag", "");
-        
-        // 1. Truncate RAG answer ONLY if it's a massive document (to prevent Groq 413 crashes).
-        // 2000 characters is plenty for detailed answers, but stops huge PDF dumps from breaking the app.
-        if (ragAnswer.length() > 2000) {
-            ragAnswer = ragAnswer.substring(0, 2000) + "... [truncated]";
-        }
-
-        // 2. Use .encode() instead of .encodePrettily() to remove all whitespace and save thousands of tokens!
-        // AI models don't need pretty spacing, they just need the raw data.
-        String localStr = masterPackage.getJsonArray("local") != null ? masterPackage.getJsonArray("local").encode() : "None";
-        String usdaStr = masterPackage.getJsonObject("usda") != null ? masterPackage.getJsonObject("usda").encode() : "None";
-
-        // 3. Ultra-compact prompt to save tokens
-        String prompt = "Nutrition assistant. Answer using only this data:\n" +
-            "Q: " + rq.getOriginalQuestion() + "\n" +
-            "Local: " + localStr + "\n" +
-            "USDA: " + usdaStr + "\n" +
-            "RAG: " + ragAnswer + "\n" +
-            "Reply concisely.";
-            
-        System.out.println("🧠 FINAL AI PROMPT - Exact text sent to AI:\n" + prompt);
-        
-        return aiCaller.apply(prompt).map(aiAnswer -> {
-            // After obtaining clean text answer, format final UI payload.
-            String safeAnswer = sanitizeLimitedHtml(aiAnswer);
-            return withImageAndDefinition(new JsonObject(), null, "NutritionGuard AI Assistant", safeAnswer);
-        });
-    }
-
-  // System prompt remains unchanged
-
-  /*
-   * Legacy NLU routing prompt kept commented out while the current unified retrieval
-   * pipeline remains active.
-   */
-  // private static final String NLU_ROUTING_PROMPT = """
-  // You are an expert routing, intent classification, and entity extraction assistant for a health and nutrition application.
-  // Your job is to analyze the user's message, determine the appropriate destination, infer the user's intent, and extract any relevant entities.
-  //
-  // Destinations (choose exactly one):
-  // - "GREETING"
-  // - "LOCAL_DB"
-  // - "USDA_SEARCH"
-  // - "CHAT"
-  //
-  // Intents (choose exactly one):
-  // - "NUTRIENT_LOOKUP"
-  // - "FOOD_BENEFIT"
-  // - "FOOD_COMPARISON"
-  // - "SYMPTOM_ANALYSIS"
-  // - "MEAL_RECOMMENDATION"
-  // - "DIET_PLANNING"
-  // - "VITAMIN_LOOKUP"
-  // - "GENERAL_NUTRITION_CHAT"
-  // - "GREETING"
-  //
-  // Entities to extract (set to null if not applicable):
-  // - "food_item"
-  // - "nutrient"
-  // - "symptom"
-  // - "goal"
-  // - "meal_type"
-  //
-  // Extract the clean food item name as "food_item". Return a raw, minified JSON object with the following keys:
-  // {
-  //   "destination": "<one of the destinations>",
-  //   "intent": "<one of the intents>",
-  //   "food_item": "<extracted food item or null>",
-  //   "nutrient": "<extracted nutrient or null>",
-  //   "symptom": "<extracted symptom or null>",
-  //   "goal": "<extracted goal or null>",
-  //   "meal_type": "<extracted meal type or null>"
-  // }
-  // """;
-
-  private static final String FALLBACK_IMAGE_URL =
+   
+     private static final String FALLBACK_IMAGE_URL =
     "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80";
 
   public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService, QueryUnderstandingService queryUnderstandingService) {
@@ -330,68 +130,7 @@ public class VitaminChatService {
         });
     }
 
-  /*
-   * Legacy Gemini-based NLU routing classifier kept commented out.
-   * The current ask(...) path uses the unified retrieval pipeline instead.
-   */
-  // /**
-  //  * Dispatches system instructions to Gemini and parses the response schema into a JSON Object.
-  //  */
-  // private Future<JsonObject> classifyIntent(String userQuestion) {
-  //   String apiKey = config.geminiApiKey();
-  //   if (apiKey == null || apiKey.isBlank()) {
-  //     return Future.failedFuture("Missing GEMINI_API_KEY for routing classification.");
-  //   }
-  //
-  //   String encodedKey = URLEncoder.encode(apiKey.trim(), StandardCharsets.UTF_8);
-  //   String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodedKey;
-  //
-  //   JsonObject requestBody = new JsonObject()
-  //     .put("systemInstruction", new JsonObject()
-  //       .put("parts", new JsonArray().add(new JsonObject().put("text", NLU_ROUTING_PROMPT)))
-  //     )
-  //     .put("contents", new JsonArray().add(new JsonObject()
-  //       .put("role", "user")
-  //       .put("parts", new JsonArray().add(new JsonObject().put("text", "User query: \"" + userQuestion + "\"")))
-  //     ))
-  //     .put("generationConfig", new JsonObject()
-  //       .put("responseMimeType", "application/json") // Forces Gemini to return structured raw JSON
-  //       .put("temperature", 0.1)                      // Low temperature ensures strict routing accuracy
-  //       .put("maxOutputTokens", 150)
-  //     );
-  //
-  //   return webClient
-  //     .postAbs(endpoint)
-  //     .timeout(GEMINI_TIMEOUT_MS)
-  //     .putHeader("Content-Type", "application/json")
-  //     .sendJsonObject(requestBody)
-  //     .compose(response -> {
-  //       if (response.statusCode() < 200 || response.statusCode() >= 300) {
-  //         if (response.statusCode() == 429) {
-  //           return Future.failedFuture("429 Rate limit exceeded for Gemini NLU routing");
-  //         }
-  //         if (response.statusCode() == 503) {
-  //           return Future.failedFuture("503 Service unavailable for Gemini NLU routing");
-  //         }
-  //         return Future.failedFuture("Intent classifier returned HTTP error status: " + response.statusCode());
-  //       }
-  //
-  //       JsonObject json = response.bodyAsJsonObject();
-  //       String textResult = extractGeminiText(json);
-  //
-  //       if (textResult == null || textResult.isBlank()) {
-  //         return Future.failedFuture("Received empty response from Gemini intent classifier.");
-  //       }
-  //
-  //       try {
-  //         JsonObject parsedRouting = new JsonObject(textResult.trim());
-  //         return Future.succeededFuture(parsedRouting);
-  //       } catch (Exception e) {
-  //         return Future.failedFuture("Failed to parse NLU JSON output: " + e.getMessage());
-  //       }
-  //     });
-  // }
-
+  
   /**
    * Direct generative fallback conversation pipeline.
    */
@@ -408,198 +147,114 @@ public class VitaminChatService {
       });
   }
 
-  /*
-   * Legacy retrieval routing pipeline kept commented out.
-   * The current ask(...) implementation uses the unified retrieval path above.
-   */
-  // /**
-  //  * Retrieval Pipeline: Coordinates local DB and USDA APIs based on priority.
-  //  */
-  // public Future<JsonObject> executeRetrievalPipeline(String originalQuestion, String cleanFoodItem, String primaryDestination) {
-  //   if (cleanFoodItem == null || cleanFoodItem.isBlank()) {
-  //     return fallbackToAI(originalQuestion, buildNoRecordFoodResponse(originalQuestion));
-  //   }
-  //
-  //   if ("LOCAL_DB".equalsIgnoreCase(primaryDestination)) {
-  //     // Prioritize checking our local database rows first
-  //     return searchLocalDb(cleanFoodItem).compose(dbResult -> {
-  //       if (dbResult != null) {
-  //         return augmentWithAi(originalQuestion, dbResult, "database");
-  //       }
-  //       // Fallback Step 2: Try USDA API
-  //       return callUsda(cleanFoodItem).compose(usdaResult -> {
-  //         if (usdaResult != null) {
-  //           return augmentWithAi(originalQuestion, usdaResult, "usda");
-  //         }
-  //         // Fallback Step 3: Try Vector RAG Store
-  //         return queryRagAndSynthesize(originalQuestion);
-  //       });
-  //     });
-  //   } else {
-  //     // Prioritize standard commodity USDA lookups first
-  //     return callUsda(cleanFoodItem).compose(usdaResult -> {
-  //       if (usdaResult != null) {
-  //         return augmentWithAi(originalQuestion, usdaResult, "usda");
-  //       }
-  //       // Fallback Step 2: Try Local Database
-  //       return searchLocalDb(cleanFoodItem).compose(dbResult -> {
-  //         if (dbResult != null) {
-  //           return augmentWithAi(originalQuestion, dbResult, "database");
-  //         }
-  //         // Fallback Step 3: Try Vector RAG Store
-  //         return queryRagAndSynthesize(originalQuestion);
-  //       });
-  //     });
-  //   }
-  // }
-  //
-  // private Future<JsonObject> queryRagAndSynthesize(String originalQuestion) {
-  //   return callRagService(originalQuestion).compose(ragContext -> {
-  //     if (ragContext != null && !ragContext.isBlank()) {
-  //       return synthesizeWithRag(originalQuestion, ragContext);
-  //     }
-  //     return fallbackToAI(originalQuestion, buildNoRecordFoodResponse(originalQuestion));
-  //   });
-  // }
 
-  private Future<JsonObject> searchLocalDb(String query) {
-    return foods.search(query).map(items -> {
-      if (items == null || items.isEmpty()) return null;
+        // 🚑 THE RESCUE SAFETY NET
+    // If the main NLU fails to find a food, we ask the AI one simple question:
+    // "Is there a food name in this sentence?"
+    private Future<String> rescueExtractFoodName(String question) {
+        String rescuePrompt = "You are a strict food entity extractor. Read the following user question and extract the exact name of the food or dish mentioned. " +
+                "If the user is asking a general question without mentioning a specific food, reply with exactly the word 'NONE'. " +
+                "Do not explain. Output ONLY the food name or 'NONE'.\n\n" +
+                "Question: \"" + question + "\"\n" +
+                "Food name:";
+                
+        return aiCaller.apply(rescuePrompt).map(response -> {
+            String cleaned = response.trim().toLowerCase();
+            // If the AI says NONE, or if it returns garbage, we return null
+            if (cleaned.contains("none") || cleaned.isEmpty() || cleaned.length() > 50) {
+                return null; 
+            }
+            // Clean up any punctuation the AI might have added
+            return cleaned.replaceAll("[^a-z0-9\\s]", "").trim();
+        }).recover(err -> {
+            System.out.println("🚑 Rescue AI call failed: " + err.getMessage());
+            return Future.succeededFuture(null);
+        });
+    }
+    private Future<JsonObject> retrieveLocal(RetrievalQuery rq) {
+        // 1. Get the extracted foods from the main NLU
+        List<String> extractedFoods = rq.getUnderstanding().getSearchContext().getFoods();
+        
+        // 2. If the NLU found a food, search the DB immediately!
+        if (extractedFoods != null && !extractedFoods.isEmpty()) {
+            String query = String.join(" ", extractedFoods);
+            System.out.println("🔍 LOCAL DB SEARCH - Query sent to DB: " + query);
+            
+            return foods.search(query).map(items -> {
+                if (items == null || items.isEmpty()) return null;
+                JsonArray limited = new JsonArray();
+                for (int i = 0; i < Math.min(3, items.size()); i++) {
+                    limited.add(items.getJsonObject(i));
+                }
+                System.out.println("🔍 LOCAL DB RESULT - Found " + limited.size() + " items.");
+                return new JsonObject().put("items", limited);
+            });
+        }
 
-      JsonObject first = items.getJsonObject(0);
-      if (first == null) return null;
+        // 3. 🚑 RESCUE TRIGGERED: The NLU failed to find a food.
+        System.out.println("⚠️ NLU found no foods. Triggering Rescue Extraction...");
+        
+        return rescueExtractFoodName(rq.getOriginalQuestion()).compose(rescuedFood -> {
+            if (rescuedFood == null) {
+                System.out.println("🛑 Rescue failed (User likely didn't mention a food). Skipping Local DB.");
+                return Future.succeededFuture(null);
+            }
+            
+            System.out.println("🚑 Rescue SUCCESS! Found food: " + rescuedFood);
+            
+            // Now search the DB with the rescued food name!
+            return foods.search(rescuedFood).map(items -> {
+                if (items == null || items.isEmpty()) return null;
+                JsonArray limited = new JsonArray();
+                for (int i = 0; i < Math.min(3, items.size()); i++) {
+                    limited.add(items.getJsonObject(i));
+                }
+                return new JsonObject().put("items", limited);
+            });
+        });
+    }
 
-      String name = first.getString("food_name", "");
-      if (name.isBlank()) return null;
+  
+    private Future<String> queryRagWithContext(RetrievalQuery rq) {
+        // Build prompt using only the user's question and extracted search terms.
+        String ragPrompt = "User original question: " + rq.getOriginalQuestion() + "\nSearch terms: " + String.join(" ", rq.getUnderstanding().getSearchTerms());
 
-      return buildFoodResponse(first, query, true);
-    });
-  }
+         //logger.info("📚 RAG SEARCH - Prompt sent to RAG:\n{}", ragPrompt);
+         System.out.println("📚 RAG SEARCH - Prompt sent to RAG:\n" + ragPrompt);
+        return ragService.query(ragPrompt);
+    }
+        private Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage) {
+        String ragAnswer = masterPackage.getString("rag", "");
+        
+        // 1. Truncate RAG answer ONLY if it's a massive document (to prevent Groq 413 crashes).
+        // 2000 characters is plenty for detailed answers, but stops huge PDF dumps from breaking the app.
+        if (ragAnswer.length() > 2000) {
+            ragAnswer = ragAnswer.substring(0, 2000) + "... [truncated]";
+        }
 
-  /*
-   * Legacy AI augmentation helpers are kept commented out.
-   */
-  // private Future<JsonObject> augmentWithAi(String question, JsonObject baseResponse, String source) {
-  //   if (config.geminiApiKey() == null || config.geminiApiKey().isBlank()) {
-  //     return Future.succeededFuture(baseResponse);
-  //   }
-  //
-  //   String contextJson = baseResponse.encode();
-  //   String prompt =
-  //     "User asked: " + question + "\n\n"
-  //       + "Context (from " + source + "): " + contextJson + "\n\n"
-  //       + "Provide a short explanation and practical advice based on this data. Do not repeat nutrition numbers already shown to the user.";
-  //
-  //   return callGeminiWithFallback(prompt)
-  //     .map(aiAnswer -> {
-  //       String safeAi = sanitizeLimitedHtml(aiAnswer);
-  //       String combined = baseResponse.getString("answer", "")
-  //         + "<br><br><b>AI insight</b><br>" + safeAi;
-  //       baseResponse.put("answer", combined);
-  //       return baseResponse;
-  //     })
-  //     .recover(err -> Future.succeededFuture(baseResponse));
-  // }
-  //
-  // private Future<JsonObject> synthesizeWithRag(String question, String ragContext) {
-  //   if (config.geminiApiKey() == null || config.geminiApiKey().isBlank()) {
-  //     String answer = "<b>Nutrition Information</b><br>" + escapeHtml(ragContext);
-  //     return Future.succeededFuture(withImageAndDefinition(
-  //       new JsonObject().put("name", "Nutrition Information").put("food_name", "Nutrition Information"),
-  //       null,
-  //       "Information retrieved from nutrition documents.",
-  //       answer
-  //     ));
-  //   }
-  //
-  //   String prompt =
-  //     "User asked: " + question + "\n\n"
-  //       + "Context (from nutrition documents): " + ragContext + "\n\n"
-  //       + "Using the context above, answer the user's question. Explain the key points in simple terms.";
-  //
-  //   return aiCaller.apply(prompt)
-  //     .map(aiAnswer -> {
-  //       String safeAi = sanitizeLimitedHtml(aiAnswer);
-  //       return withImageAndDefinition(
-  //         new JsonObject().put("name", "Nutrition Information").put("food_name", "Nutrition Information"),
-  //         null,
-  //         "Information synthesized from nutrition documents.",
-  //         safeAi
-  //       );
-  //     })
-  //     .recover(err -> {
-  //       String answer = "<b>Nutrition Information</b><br>" + escapeHtml(ragContext);
-  //       return Future.succeededFuture(withImageAndDefinition(
-  //         new JsonObject().put("name", "Nutrition Information").put("food_name", "Nutrition Information"),
-  //         null,
-  //         "Information retrieved from nutrition documents.",
-  //         answer
-  //       ));
-  //     });
-  // }
+        // 2. Use .encode() instead of .encodePrettily() to remove all whitespace and save thousands of tokens!
+        // AI models don't need pretty spacing, they just need the raw data.
+        String localStr = masterPackage.getJsonArray("local") != null ? masterPackage.getJsonArray("local").encode() : "None";
+        String usdaStr = masterPackage.getJsonObject("usda") != null ? masterPackage.getJsonObject("usda").encode() : "None";
 
-  private Future<String> callRagService(String question) {
-    return ragService.query(question);
-  }
-
-  // private Future<JsonObject> fallbackToAI(String question, JsonObject defaultResponse) {
-  //   if (config.geminiApiKey() == null || config.geminiApiKey().isBlank()) {
-  //     return Future.succeededFuture(defaultResponse);
-  //   }
-  //   return aiCaller.apply("Please answer this nutrition-related question: " + question)
-  //     .map(aiAnswer -> {
-  //       defaultResponse.put("answer", sanitizeLimitedHtml(aiAnswer));
-  //       if (defaultResponse.getString("definition", "").isBlank()) {
-  //         defaultResponse.put("definition", "NutritionGuard AI Assistant");
-  //       }
-  //       return defaultResponse;
-  //     })
-  //     .recover(err -> {
-  //       System.err.println("Gemini API error: " + err.getMessage());
-  //       return Future.succeededFuture(defaultResponse);
-  //     });
-  // }
-
-  // ---------------------------------------------------------------------------
-  // Legacy keyword pipeline: runtime fallback when Gemini NLU is rate-limited
-  // ---------------------------------------------------------------------------
-
-  // private Future<JsonObject> legacyKeywordPipeline(String question) {
-  //   if (isGreeting(question)) {
-  //     return Future.succeededFuture(withImageAndDefinition(
-  //       new JsonObject(), null,
-  //       "NutritionGuard AI is a nutrition assistant that helps explain foods and vitamins in simple terms.",
-  //       "Hello! I am your NutriGuard AI. I can help you find vitamin information, suggest healthy meals, or track your progress!"
-  //     ));
-  //   }
-  //
-  //   String cleanedQuery = cleanQueryLegacy(question);
-  //   if (cleanedQuery == null || cleanedQuery.isBlank()) {
-  //     return runDirectAiPipeline(question);
-  //   }
-  //
-  //   String destination = determineDestinationLegacy(question, cleanedQuery);
-  //   return executeRetrievalPipeline(question, cleanedQuery, destination);
-  // }
-  //
-  // private String cleanQueryLegacy(String question) {
-  //   if (question == null) return null;
-  //   String cleaned = question.toLowerCase()
-  //     .replaceAll("(?i)\\b(what is|how much|how many|tell me about|is there|can i|do you|what are|tell us about|is|a|an|the|for|with|of|in|on|at|to)\\b", "")
-  //     .replaceAll("\\s+", " ")
-  //     .trim();
-  //   return cleaned.isEmpty() ? null : cleaned;
-  // }
-  //
-  // private String determineDestinationLegacy(String question, String cleanedQuery) {
-  //   String lower = question.toLowerCase();
-  //   if (lower.contains("salad") || lower.contains("soup") || lower.contains("stew")
-  //       || lower.contains("curry") || lower.contains("plate") || lower.contains("bread")
-  //       || (cleanedQuery.contains(" ") && (lower.contains("wat") || lower.contains("rice")))) {
-  //     return "LOCAL_DB";
-  //   }
-  //   return "USDA_SEARCH";
-  // }
+        // 3. Ultra-compact prompt to save tokens
+        String prompt = "You are a strict nutrition assistant. Answer the user's question using ONLY the provided data. " +
+                "If the provided data is empty, or if the question is completely unrelated to food/nutrition, " +
+                "you MUST reply with EXACTLY this phrase and nothing else: 'I am a nutritional assistant and only answer food-related or descriptive nutrition questions.'\n\n" +
+                "Q: " + rq.getOriginalQuestion() + "\n" +
+                "Local: " + localStr + "\n" +
+                "USDA: " + usdaStr + "\n" +
+                "RAG: " + ragAnswer + "\n" +
+                "Reply concisely.";
+            
+        System.out.println("🧠 FINAL AI PROMPT - Exact text sent to AI:\n" + prompt);
+        
+        return aiCaller.apply(prompt).map(aiAnswer -> {
+            // After obtaining clean text answer, format final UI payload.
+            String safeAnswer = sanitizeLimitedHtml(aiAnswer);
+            return withImageAndDefinition(new JsonObject(), null, "NutritionGuard AI Assistant", safeAnswer);
+        });
+    }
 
         private Future<JsonObject> retrieveUsda(RetrievalQuery rq) {
         // 1. Get the extracted foods and nutrients from the main NLU
@@ -720,7 +375,7 @@ public class VitaminChatService {
           // 🚨 PRINT THE EXACT GEMINI ERROR HERE
           System.out.println("🚨 Primary model (Gemini) failed: " + err.getMessage());
           System.out.println("Switching to Groq...");
-          return callGroq("llama-3.1-8b-instant", prompt);
+          return callGroq("llama-3.3-70b-versatile", prompt);
       })
       .recover(err -> {
           // 🚨 PRINT THE EXACT GROQ ERROR HERE
@@ -748,7 +403,7 @@ public class VitaminChatService {
         .add(new JsonObject().put("role", "user").put("content", prompt))
       )
             .put("temperature", 0.4)
-      .put("max_tokens", 1000); // <--- INCREASED TO 1000
+      .put("max_tokens", 2000); // <--- INCREASED TO 2000
 
     return webClient
       .postAbs(endpoint)
@@ -812,7 +467,7 @@ public class VitaminChatService {
             .put("generationConfig", new JsonObject()
         .put("temperature", 0.4)
         .put("topP", 0.95)
-        .put("maxOutputTokens", 1000) // <--- INCREASED TO 1000
+        .put("maxOutputTokens", 2000) // <--- INCREASED TO 2000
       );
 
     return webClient
@@ -942,8 +597,7 @@ public class VitaminChatService {
     if (lower.isEmpty()) return false;
 
     String[] chatPatterns = {
-      "who is", "who are", "what is the weather", "what's the weather",
-      "tell me a joke", "tell us a joke", "tell me a story",
+      "who is", "who are", 
       "how old are you", "where are you", "what can you do",
       "who created you", "who made you", "what is your name",
       "thank you", "thanks", "you're welcome",
@@ -958,88 +612,6 @@ public class VitaminChatService {
     return false;
   }
 
-  private boolean isValidFoodExtraction(String foodItem, String originalQuestion) {
-    if (foodItem == null || foodItem.isBlank()) return false;
-    if (originalQuestion == null || originalQuestion.isBlank()) return true;
-
-    String lower = foodItem.toLowerCase().trim();
-    String questionLower = originalQuestion.toLowerCase().trim();
-
-    // Reject single words that are clearly not food (greetings, question words, verbs, pronouns)
-    if (lower.matches("^(hi|hello|hey|howdy|yo|sup|how|why|what|when|where|who|which|does|did|do|is|are|can|will|would|could|should|have|has|had|make|made|get|got|eat|ate|use|used|say|said|tell|told|ask|asked|give|gave|take|took|let|like|just|good|bad|best|worst|safe|not|no|yes|maybe|okay|ok|please|thanks|thank|sorry|bye|goodbye|hello|hey|hi|sup|yo)$")) {
-      return false;
-    }
-
-    // Reject if no word from extracted item appears in the original question
-    String[] foodWords = lower.split("\\s+");
-    boolean anyWordFound = false;
-    for (String w : foodWords) {
-      if (w.length() > 2 && questionLower.contains(w)) {
-        anyWordFound = true;
-        break;
-      }
-    }
-    if (!anyWordFound && foodWords.length <= 3) {
-      return false;
-    }
-
-    // Reject if the extracted item has no food-like word (all words are generic/non-food)
-    String[] genericWords = {
-      "make", "me", "my", "you", "your", "yours", "it", "its",
-      "is", "are", "am", "be", "been", "being",
-      "do", "does", "did", "done", "doing",
-      "have", "has", "had", "having",
-      "can", "will", "would", "could", "should", "shall", "may", "might", "must",
-      "this", "that", "these", "those",
-      "the", "a", "an", "and", "or", "but", "not", "no",
-      "get", "got", "gotten", "want", "wanted", "wanting",
-      "need", "needed", "needing", "use", "used", "using",
-      "say", "said", "tell", "told", "ask", "asked",
-      "give", "gave", "given", "take", "took", "taken",
-      "let", "like", "liked", "just",
-      "good", "bad", "better", "best", "worst", "worse",
-      "safe", "unsafe", "healthy", "unhealthy",
-      "sleepy", "tired", "awake", "energetic", "sluggish",
-      "why", "how", "what", "when", "where", "who", "which",
-      "very", "too", "so", "much", "many", "some", "any",
-      "more", "less", "few", "little", "lot", "lots",
-      "always", "never", "often", "sometimes", "usually",
-      "please", "thanks", "thank", "sorry",
-      "hi", "hello", "hey", "bye", "goodbye", "ok", "okay", "yes", "no", "maybe",
-      "really", "actually", "basically", "literally",
-      "about", "above", "after", "again", "against", "all",
-      "also", "because", "before", "between", "both",
-      "each", "every", "first", "from", "here", "here's",
-      "however", "if", "into", "just", "last", "least",
-      "most", "next", "now", "once", "only", "other",
-      "over", "own", "same", "such", "than", "then",
-      "there", "through", "thus", "too", "under", "until",
-      "up", "very", "was", "well", "when", "where",
-      "while", "while", "with", "within", "without",
-      "yet"
-    };
-    int genericCount = 0;
-    for (String w : foodWords) {
-      for (String g : genericWords) {
-        if (w.equals(g)) {
-          genericCount++;
-          break;
-        }
-      }
-    }
-    if (genericCount == foodWords.length) {
-      return false; // All words are generic/non-food
-    }
-
-    return true;
-  }
-
-  private boolean isValidIntent(String intent) {
-    return VALID_INTENTS.contains(intent);
-}
-
-// ---------------------------------------------------------------------------
-// Response builders
 // ---------------------------------------------------------------------------
   // Response builders
   // ---------------------------------------------------------------------------

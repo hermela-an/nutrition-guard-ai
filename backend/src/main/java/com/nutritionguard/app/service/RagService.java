@@ -27,7 +27,7 @@ public class RagService {
     JsonObject body = new JsonObject().put("query", question != null ? question : "");
 
     return webClient.postAbs(ragApiUrl)
-      .timeout(10000)
+      .timeout(20000)
       .putHeader("Content-Type", "application/json")
       .sendJsonObject(body)
       .map(response -> {
