@@ -380,6 +380,11 @@ public class VitaminChatService {
       .recover(err -> {
           // 🚨 PRINT THE EXACT GROQ ERROR HERE
           System.out.println("🚨 Groq model failed: " + err.getMessage());
+          System.out.println("Switching to LM Studio...");
+          return callLmStudio(prompt);
+      })
+      .recover(err -> {
+          System.out.println("🚨 LM Studio model failed: " + err.getMessage());
           System.out.println("Using safe fallback...");
           return Future.succeededFuture(
               "I'm currently experiencing high demand. Please try again shortly, or ask about specific foods or nutrients."
@@ -444,6 +449,68 @@ public class VitaminChatService {
     if (message == null) return null;
 
     return message.getString("content");
+  }
+
+  private Future<String> callLmStudio(String userPrompt) {
+    String endpoint = "http://127.0.0.1:1234/api/v1/chat";
+    String prompt = userPrompt == null ? "" : userPrompt;
+
+    JsonObject requestBody = new JsonObject()
+      .put("model", "google/gemma-4-e4b")
+      .put("input", prompt)
+      .put("context_length", 8000)
+      .put("temperature", 0);
+
+    return webClient
+      .postAbs(endpoint)
+      .timeout(60000)
+      .putHeader("Content-Type", "application/json")
+      .sendJsonObject(requestBody)
+      .compose(response -> {
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+          return Future.failedFuture("LM Studio HTTP Error: " + response.statusCode() + " " + safeTruncate(response.bodyAsString(), 1200));
+        }
+
+        JsonObject json;
+        try {
+          json = response.bodyAsJsonObject();
+        } catch (Exception e) {
+          return Future.failedFuture("Error parsing LM Studio JSON: " + e.getMessage());
+        }
+
+        String text = extractLmStudioText(json);
+        if (text == null || text.isBlank()) {
+          return Future.failedFuture("LM Studio response invalid or empty");
+        }
+
+        return Future.succeededFuture(text.trim());
+      });
+  }
+
+  private String extractLmStudioText(JsonObject json) {
+    if (json == null) return null;
+    
+    // Try standard OpenAI format
+    JsonArray choices = json.getJsonArray("choices");
+    if (choices != null && !choices.isEmpty()) {
+      JsonObject choice = choices.getJsonObject(0);
+      if (choice != null) {
+        JsonObject message = choice.getJsonObject("message");
+        if (message != null && message.getString("content") != null) {
+          return message.getString("content");
+        }
+        if (choice.getString("text") != null) {
+          return choice.getString("text");
+        }
+      }
+    }
+
+    // Try generic flat formats just in case the custom API returns a flat response
+    if (json.getString("text") != null) return json.getString("text");
+    if (json.getString("response") != null) return json.getString("response");
+    if (json.getString("content") != null) return json.getString("content");
+
+    return null;
   }
 
   private Future<String> callGemini(String model, String userPrompt) {

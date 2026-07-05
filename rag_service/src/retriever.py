@@ -3,19 +3,17 @@ from typing import Dict, List, Tuple
 from src.vectorstore import FaissVectorStore
 
 class Retriever:
-    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2"):
-        self.vectorstore = FaissVectorStore(persist_dir, embedding_model)
+    def __init__(self, persist_dir: str = "faiss_store", data_dir: str = "data", embedding_model: str = "all-MiniLM-L6-v2"):
+        # 1. FIX: Use explicit keyword arguments so 'data_dir' doesn't get confused with the model name
+        self.vectorstore = FaissVectorStore(
+            persist_dir=persist_dir, 
+            data_dir=data_dir, 
+            embedding_model=embedding_model
+        )
         
-        faiss_path = os.path.join(persist_dir, "faiss.index")
-        meta_path = os.path.join(persist_dir, "metadata.pkl")
-        
-        if not (os.path.exists(faiss_path) and os.path.exists(meta_path)):
-            from src.data_loader import load_all_documents
-            docs = load_all_documents("data")
-            if not self.vectorstore.build_from_documents(docs):
-                print("[WARN] Retriever initialized without a vector index because no documents were available.")
-        else:
-            self.vectorstore.load()
+        # 2. FIX: Removed the manual os.path.exists checks and load/build logic.
+        # The api.py startup event now calls `retriever.vectorstore.initialize()`, 
+        # which automatically handles checking the manifest, loading from disk, or rebuilding!
 
     def retrieve_context_and_sources(self, query: str, top_k: int = 5) -> Tuple[str, List[Dict]]:
         if self.vectorstore.index is None:

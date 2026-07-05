@@ -11,6 +11,16 @@ class LLMService:
     def summarize(self, query: str, context: str) -> str:
         if not context:
             return "No relevant documents found."
+                 
+        # --- ADD THIS SAFETY TRUNCATION ---
+        # 100,000 characters is roughly 25,000 tokens. 
+        # This keeps us safely under Groq's 100k token limit.
+        MAX_CHARS = 100000 
+        if len(context) > MAX_CHARS:
+            print(f"[WARNING] Context too large ({len(context)} chars). Truncating to {MAX_CHARS} chars.")
+            context = context[:MAX_CHARS] + "\n\n[Note: Context was truncated due to length limits.]"
+        # ------------------------------------
+            
             
         prompt = f"""You are a precise and highly accurate assistant.
 Instead of guessing, you must rely strictly on the provided Context to answer the Query.

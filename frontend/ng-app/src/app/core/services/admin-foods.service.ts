@@ -69,4 +69,8 @@ export class AdminFoodsService {
   importFoods(data: any[]): Observable<{ message: string; count: number; items: AdminFoodItem[] }> {
     return this.api.post<{ message: string; count: number; items: AdminFoodItem[] }>(`/api/admin/foods-import`, data, this.auth.authHeaders());
   }
+
+  uploadDocuments(formData: FormData): Observable<{ message: string; count: number }> {
+    return this.api.post<{ message: string; count: number }>(`/api/admin/documents-upload`, formData, this.auth.authHeaders());
+  }
 }

@@ -14,6 +14,46 @@ public class AdminFoodController {
   }
 
   public void mount(Router router) {
+    router.post("/api/admin/documents-upload").handler(ctx -> {
+      try {
+        var uploads = ctx.fileUploads();
+        if (uploads.isEmpty()) {
+          ctx.fail(400, new RuntimeException("No files uploaded"));
+          return;
+        }
+
+        String targetDir = "c:\\project\\NutritionGuard AI\\rag_service\\data";
+        io.vertx.core.file.FileSystem fs = ctx.vertx().fileSystem();
+        fs.mkdirsBlocking(targetDir);
+
+        for (io.vertx.ext.web.FileUpload f : uploads) {
+          // Use REPLACE_EXISTING logic by deleting first if it exists, since moveBlocking might fail if target exists
+          String targetPath = targetDir + java.io.File.separator + f.fileName();
+          if (fs.existsBlocking(targetPath)) {
+            fs.deleteBlocking(targetPath);
+          }
+          fs.moveBlocking(f.uploadedFileName(), targetPath);
+        }
+
+        io.vertx.ext.web.client.WebClient.create(ctx.vertx())
+          .post(5000, "127.0.0.1", "/reindex")
+          .send()
+          .onSuccess(resp -> {
+            ctx.response()
+              .putHeader("Content-Type", "application/json")
+              .end(new JsonObject()
+                .put("message", "Files stored successfully. Background indexing started.")
+                .put("count", uploads.size())
+                .encode());
+          })
+          .onFailure(err -> {
+            ctx.fail(500, new RuntimeException("Files saved but failed to trigger indexing: " + err.getMessage()));
+          });
+      } catch (Throwable t) {
+        ctx.fail(t);
+      }
+    });
+
     router.post("/api/admin/foods-import").handler(ctx -> {
       try {
         Object body = ctx.body() == null ? null : ctx.body().asJsonArray();

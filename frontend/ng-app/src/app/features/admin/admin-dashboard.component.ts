@@ -41,6 +41,13 @@ export class AdminDashboardComponent {
 
   editing: AdminFoodItem | null = null;
   showModal = false;
+  
+  // Document Upload Properties
+  showUploadModal = false;
+  uploadingFiles: File[] = [];
+  isDragOver = false;
+  isUploadingDocs = false;
+  uploadProgress = '';
   form: Partial<AdminFoodItem> = this.emptyForm();
   healthEffect: Record<string, string> = {};
   vitaminRows: Array<{ label: string; value: string }> = [{ label: '', value: '' }];
@@ -569,5 +576,105 @@ export class AdminDashboardComponent {
       el.focus();
       el.select();
     }, 0);
+  }
+
+  // --- Document Upload Modal Methods ---
+
+  openDocumentUploadModal(): void {
+    this.showUploadModal = true;
+    this.uploadingFiles = [];
+    this.uploadProgress = '';
+  }
+
+  closeUploadModal(): void {
+    if (this.isUploadingDocs) return;
+    this.showUploadModal = false;
+    this.uploadingFiles = [];
+    this.uploadProgress = '';
+  }
+
+  onUploadOverlayClick(event: MouseEvent): void {
+    this.closeUploadModal();
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+    if (event.dataTransfer?.files) {
+      this.handleFiles(Array.from(event.dataTransfer.files));
+    }
+  }
+
+  onDocumentFileSelected(event: Event, input: HTMLInputElement): void {
+    if (input.files) {
+      this.handleFiles(Array.from(input.files));
+    }
+    input.value = '';
+  }
+
+  private handleFiles(files: File[]): void {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const validExtensions = ['.pdf', '.docx', '.txt', '.csv', '.json', '.xlsx'];
+    for (const file of files) {
+      if (file.size > maxSize) {
+        this.toast.error(`File ${file.name} is too large. Max size is 10MB.`);
+        continue;
+      }
+      const extMatch = file.name.match(/\.[^.]+$/);
+      const ext = extMatch ? extMatch[0].toLowerCase() : '';
+      if (!validExtensions.includes(ext)) {
+        this.toast.error(`File type ${ext || 'unknown'} not supported for ${file.name}.`);
+        continue;
+      }
+      if (!this.uploadingFiles.find(f => f.name === file.name)) {
+        this.uploadingFiles.push(file);
+      }
+    }
+  }
+
+  removeUploadFile(index: number): void {
+    this.uploadingFiles.splice(index, 1);
+  }
+
+  submitDocuments(): void {
+    if (this.uploadingFiles.length === 0) return;
+    this.isUploadingDocs = true;
+    this.uploadProgress = `Saving ${this.uploadingFiles.length} documents to data directory...`;
+    
+    const formData = new FormData();
+    for (const file of this.uploadingFiles) {
+      formData.append('file', file); // Should match backend parameter name if any, or general 'file'
+    }
+
+    this.foodsApi.uploadDocuments(formData).pipe(
+      timeout(30_000),
+      finalize(() => {
+        this.isUploadingDocs = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (res) => {
+        this.toast.success(`✓ ${res.count} documents uploaded successfully.\n✓ Files stored successfully.\n✓ Background indexing started.\nDocuments will become searchable when processing completes.`);
+        this.closeUploadModal();
+      },
+      error: (err) => {
+        const msg = this.errorFrom(err, 'Document upload failed.');
+        this.uploadProgress = msg;
+        this.toast.error(msg);
+      }
+    });
   }
 }
