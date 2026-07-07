@@ -49,7 +49,7 @@ export class LoginComponent implements OnInit, AfterViewInit {
       this.emailInput.nativeElement.value = '';
       this.passwordInput.nativeElement.value = '';
       this.cdr.detectChanges();
-    }, 0);
+    }, 100);
   }
 
   togglePassword(): void {

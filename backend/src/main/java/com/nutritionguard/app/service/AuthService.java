@@ -71,14 +71,15 @@ public class AuthService {
         return Future.failedFuture("Email already exists");
       }
       String role = isBootstrapAdminEmail(normalizedEmail) ? "ADMIN" : "USER";
-      return users.createUser(normalizedEmail, HashUtil.hashPassword(password), role, false)
+      return users.createUser(normalizedEmail, HashUtil.hashPassword(password), role, false, fullName)
         .compose(user -> sendVerificationForUser(user)
           .map(ignored -> {
             JsonObject safeUser = new JsonObject()
               .put("id", user.getString("id"))
               .put("email", user.getString("email"))
               .put("role", user.getString("role", "USER"))
-              .put("is_verified", user.getBoolean("is_verified", false));
+              .put("is_verified", user.getBoolean("is_verified", false))
+              .put("full_name", user.getString("full_name", null));
             return new JsonObject()
               .put("message", "Account created. Please verify your email to activate your account.")
               .put("user", safeUser);

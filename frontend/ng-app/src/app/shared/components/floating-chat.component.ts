@@ -11,6 +11,7 @@ interface ChatMessage {
   imageUrl?: string;
   imageErrored?: boolean;
   imageRetryCount?: number;
+  isCopied?: boolean;
 }
 
 interface SuggestionChip {
@@ -76,10 +77,11 @@ interface SuggestionChip {
           </div>
         </div>
 
-        <div class="message-group" *ngFor="let msg of messages">
+               <div class="message-group" *ngFor="let msg of messages">
           <div class="message" [class.user-msg]="msg.isUser" [class.ai-msg]="!msg.isUser">
             <div class="message-bubble">
               <span [innerHTML]="formatText(msg.text)"></span>
+              
               <img
                 *ngIf="msg.imageUrl && !msg.imageErrored"
                 [src]="msg.imageUrl"
@@ -100,16 +102,31 @@ interface SuggestionChip {
                 referrerpolicy="origin"
                 (error)="hideImage(msg)"
               >
-            </div>
+
+              <!-- ACTION BUTTONS -->
+              <div class="message-actions">
+                <button *ngIf="msg.isUser" class="action-btn" (click)="editMessage(msg)" aria-label="Edit message">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="action-btn" (click)="copyToClipboard(msg.text, msg)" [attr.aria-label]="msg.isCopied ? 'Copied!' : 'Copy message'">
+                  <svg *ngIf="msg.isCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <svg *ngIf="!msg.isCopied" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>  <!-- Closes message-bubble -->
             <div class="message-time">{{ msg.time | date:'shortTime' }}</div>
+          </div>  <!-- Closes message -->
+        </div>  <!-- Closes message-group -->
+
+                <div class="typing-indicator" *ngIf="isTyping">
+          <div class="thinking-content">
+            <span class="thinking-label">Thinking</span>
+            <div class="typing-dots">
+              <span></span><span></span><span></span>
+            </div>
           </div>
         </div>
-
-        <div class="typing-indicator" *ngIf="isTyping">
-          <span></span><span></span><span></span>
-        </div>
-      </div>
-
+      </div> 
       <div class="chat-footer">
         <div class="quick-bar" *ngIf="!sessionGateOpen && messages.length > 0" aria-label="Quick vitamin shortcuts">
           <span class="quick-bar-label">Quick vitamins</span>
@@ -124,15 +141,24 @@ interface SuggestionChip {
           </div>
         </div>
 
-        <div class="chat-input-row">
+                <div class="chat-input-row">
           <input 
             type="text" 
             [(ngModel)]="currentInput" 
             (keyup.enter)="sendMessage()"
-            placeholder="Ask a nutrition question..." 
+            [placeholder]="editingMessageIndex !== null ? 'Edit your message...' : 'Ask a nutrition question...'" 
             class="chat-input"
             [disabled]="isTyping || sessionGateOpen"
           >
+          
+          <!-- Cancel Edit Button -->
+          <button *ngIf="editingMessageIndex !== null" class="cancel-btn" (click)="cancelEdit()" aria-label="Cancel edit">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+
           <button class="send-btn" (click)="sendMessage()" [disabled]="!currentInput.trim() || isTyping || sessionGateOpen">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -256,8 +282,9 @@ interface SuggestionChip {
 
     .chat-body {
       flex: 1;
+      min-height: 0 !important;
       padding: 16px;
-      overflow-y: auto;
+      overflow-y: auto !important;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -402,6 +429,7 @@ interface SuggestionChip {
     }
 
     .chat-footer {
+     flex-shrink: 0;
       padding: 12px 16px;
       background: white;
       border-top: 1px solid #e6ede3;
@@ -514,11 +542,37 @@ interface SuggestionChip {
       border-radius: 12px;
       border-bottom-left-radius: 4px;
       display: flex;
-      gap: 4px;
       width: fit-content;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
 
-    .typing-indicator span {
+    .thinking-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .thinking-label {
+      font-size: 13px;
+      color: #6b7c6e;
+      font-weight: 500;
+      font-style: italic;
+      animation: pulseText 1.5s infinite ease-in-out;
+    }
+
+    @keyframes pulseText {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .typing-dots span {
       width: 6px;
       height: 6px;
       background: #9aa89b;
@@ -526,12 +580,70 @@ interface SuggestionChip {
       animation: bounce 1.4s infinite ease-in-out both;
     }
 
-    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
 
     @keyframes bounce {
       0%, 80%, 100% { transform: scale(0); }
       40% { transform: scale(1); }
+    }
+    
+        /* Message Actions (Edit/Copy) */
+    .message-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .user-msg .message-actions {
+      justify-content: flex-end;
+    }
+
+    .ai-msg .message-actions {
+      justify-content: flex-start;
+    }
+
+    .action-btn {
+      background: transparent;
+      border: none;
+      color: #9aa89b;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .user-msg .action-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    .ai-msg .action-btn:hover {
+      background: #f4f7f3;
+      color: var(--brand);
+    }
+
+    /* Cancel Edit Button */
+    .cancel-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #f4f7f3;
+      color: #6b7c6e;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cancel-btn:hover {
+      background: #e6ede3;
+      color: #d9534f;
     }
 
     /* Mobile handling */
@@ -561,6 +673,7 @@ export class FloatingChatComponent implements AfterViewChecked {
   private readonly cdr = inject(ChangeDetectorRef);
 
   isOpen = false;
+  editingMessageIndex: number | null = null;
   isTyping = false;
   currentInput = '';
   shouldScroll = false;
@@ -746,11 +859,19 @@ export class FloatingChatComponent implements AfterViewChecked {
     if (this.sessionGateOpen) return;
 
     // Add user message to UI immediately
-    this.messages.push({
-      text: text,
-      isUser: true,
-      time: new Date()
-    });
+        // Check if we are editing an existing message
+    if (this.editingMessageIndex !== null) {
+      this.messages[this.editingMessageIndex].text = text;
+      this.messages[this.editingMessageIndex].time = new Date();
+      this.editingMessageIndex = null; // Reset edit mode
+    } else {
+      // Add new user message to UI
+      this.messages.push({
+        text: text,
+        isUser: true,
+        time: new Date()
+      });
+    }
     this.persistIfChosen();
     
     this.isTyping = true;
@@ -837,6 +958,32 @@ export class FloatingChatComponent implements AfterViewChecked {
     } catch {
       // ignore
     }
+  }
+  
+    copyToClipboard(text: string, msg: ChatMessage): void {
+    navigator.clipboard.writeText(text).then(() => {
+      msg.isCopied = true;
+      setTimeout(() => {
+        msg.isCopied = false;
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+  }
+
+  editMessage(msg: ChatMessage): void {
+    const index = this.messages.indexOf(msg);
+    if (index > -1) {
+      this.editingMessageIndex = index; 
+      this.currentInput = msg.text;     
+      this.shouldScroll = true;
+      this.cdr.detectChanges();
+    }
+  }
+
+  cancelEdit(): void {
+    this.editingMessageIndex = null;
+    this.currentInput = '';
   }
 
   formatText(text: string): string {

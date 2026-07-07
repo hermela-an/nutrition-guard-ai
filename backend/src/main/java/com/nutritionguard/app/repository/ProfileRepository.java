@@ -40,8 +40,16 @@ public class ProfileRepository {
     )).map(rows -> map(rows.iterator().next()));
   }
 
-  public Future<JsonObject> getProfile(String userId) {
-    String sql = "SELECT user_id, age, gender, height_cm, weight_kg, activity_level, goal, health_metadata FROM profiles WHERE user_id = $1";
+    public Future<JsonObject> getProfile(String userId) {
+    // 👇 THIS IS THE EXACT SQL QUERY YOU NEED 👇
+    // Notice 'u.full_name AS name' instead of 'u.name'
+    String sql = """
+      SELECT p.user_id, p.age, p.gender, p.height_cm, p.weight_kg, p.activity_level, p.goal, p.health_metadata, u.full_name AS name, u.email 
+      FROM profiles p 
+      JOIN users u ON p.user_id = u.id 
+      WHERE p.user_id = $1
+      """;
+      
     return db.query(sql, Tuple.of(userId))
       .map(rows -> rows.iterator().hasNext() ? map(rows.iterator().next()) : null);
   }
@@ -65,7 +73,9 @@ public class ProfileRepository {
       .put("weight_kg", row.getDouble("weight_kg"))
       .put("activity_level", row.getString("activity_level"))
       .put("goal", row.getString("goal"))
-      .put("health_metadata", healthMetadata);
+      .put("health_metadata", healthMetadata)
+      .put("name", row.getString("name"))
+      .put("email", row.getString("email"));
   }
 
   private Integer asInt(JsonObject obj, String key) {

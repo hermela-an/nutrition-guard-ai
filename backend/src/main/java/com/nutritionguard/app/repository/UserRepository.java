@@ -15,7 +15,7 @@ public class UserRepository {
   private Future<Void> bootstrap;
 
   public static final String FIND_BY_EMAIL_SQL =
-    "SELECT id, email, password_hash, role, is_active, is_verified FROM public.users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))";
+     "SELECT id, email, password_hash, role, is_active, is_verified, full_name FROM public.users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))";
 
   public UserRepository(Database db) {
     this.db = db;
@@ -47,7 +47,8 @@ public class UserRepository {
         ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'USER',
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
         ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        ADD COLUMN IF NOT EXISTS full_name TEXT;
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (email);
 
@@ -80,12 +81,18 @@ public class UserRepository {
     return createUser(email, passwordHash, role, true);
   }
 
+  // CHANGE THIS METHOD to call the new 5-argument method below
   public Future<JsonObject> createUser(String email, String passwordHash, String role, boolean isVerified) {
+    return createUser(email, passwordHash, role, isVerified, null); 
+  }
+
+  // ADD THIS ENTIRE NEW METHOD
+  public Future<JsonObject> createUser(String email, String passwordHash, String role, boolean isVerified, String fullName) {
     String id = UUID.randomUUID().toString();
     String normalizedRole = normalizeRole(role);
     String sql = """
-      INSERT INTO users (id, email, password_hash, role, is_verified)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO users (id, email, password_hash, role, is_verified, full_name)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, email, role, is_active, is_verified, created_at
       """;
     return ensureSchema().compose(ignored ->
@@ -98,7 +105,8 @@ public class UserRepository {
             .put("role", row.getString("role"))
             .put("is_active", row.getBoolean("is_active"))
             .put("is_verified", row.getBoolean("is_verified"))
-            .put("created_at", row.getOffsetDateTime("created_at").toString());
+            .put("created_at", row.getOffsetDateTime("created_at").toString())
+            .put("full_name", row.getString("full_name"));
         })
     );
   }
@@ -118,7 +126,8 @@ public class UserRepository {
             .put("role", row.getString("role"))
             .put("is_active", row.getBoolean("is_active"))
             .put("is_verified", row.getBoolean("is_verified"))
-            .put("password_hash", row.getString("password_hash"));
+            .put("password_hash", row.getString("password_hash"))
+            .put("full_name", row.getString("full_name")); 
         })
     );
   }

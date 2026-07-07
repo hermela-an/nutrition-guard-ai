@@ -14,9 +14,10 @@ import com.nutritionguard.app.model.RetrievalQuery;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
 
 
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.Set;
 import com.nutritionguard.app.config.AppConfig;
 import com.nutritionguard.app.repository.FoodRepository;
@@ -33,7 +34,8 @@ public class VitaminChatService {
   private final FoodRepository foods;
   private final AppConfig config;
   private final WebClient webClient;
-  private final Function<String, Future<String>> aiCaller;
+  private final BiFunction<String, String, Future<String>> aiCaller;
+  private final ProfileService profileService;
   private final RagService ragService;
   private final QueryUnderstandingService queryUnderstandingService;
 
@@ -49,8 +51,8 @@ public class VitaminChatService {
      private static final String FALLBACK_IMAGE_URL =
     "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80";
 
-  public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService, QueryUnderstandingService queryUnderstandingService) {
-    this(vertx, config, foods, ragService, queryUnderstandingService, null);
+    public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService, QueryUnderstandingService queryUnderstandingService, ProfileService profileService) {
+    this(vertx, config, foods, ragService, queryUnderstandingService, profileService, (BiFunction<String, String, Future<String>>) null); // <-- Notice the cast here
   }
 
   public VitaminChatService(
@@ -59,23 +61,55 @@ public class VitaminChatService {
     FoodRepository foods,
     RagService ragService,
     QueryUnderstandingService queryUnderstandingService,
-    Function<String, Future<String>> aiCaller
+    ProfileService profileService,
+    BiFunction<String, String, Future<String>> aiCaller // <--- 🚨 MAKE SURE THIS SAYS BiFunction, NOT Function!
   ) {
     this.foods = foods;
     this.config = config;
     this.webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true).setTrustAll(true));
     this.ragService = ragService;
     this.queryUnderstandingService = queryUnderstandingService;
+    this.profileService = profileService;
     this.aiCaller = aiCaller == null ? this::callGeminiWithFallback : aiCaller;
   }
 
   /**
    * Main entrypoint for chat queries.
    */
-  public Future<JsonObject> ask(JsonObject body) {
+  public Future<JsonObject> ask(String userId, JsonObject body) {
     String question = body == null ? "" : body.getString("question", "");
     String vitaminKey = body == null ? null : body.getString("vitaminKey");
     Integer limit = body == null ? null : body.getInteger("limit");
+
+       // 1. Fetch profile from database using the userId
+    Future<JsonObject> profileFuture = (userId == null || userId.isBlank()) 
+        ? Future.succeededFuture(new JsonObject()) 
+        : profileService.getProfile(userId);
+
+    return profileFuture.compose(profile -> {
+
+                 // ==========================================
+        // 1. INTERCEPT "WHO AM I?" QUESTIONS
+        // ==========================================
+        if (question != null) {
+            String q = question.toLowerCase().trim();
+            
+            if (q.equals("who am i?") || q.equals("who am i") || 
+                q.contains("what is my name") || q.contains("what is my email")) {
+                
+                String name = profile.getString("name", "a registered user");
+                String email = profile.getString("email", "not provided");
+                String directAnswer = "You are logged in as " + name + ", and your email is " + email + ".";
+                
+                // Return immediately, skipping the AI completely
+                return Future.succeededFuture(withImageAndDefinition(
+                    new JsonObject(), null,
+                    "NutritionGuard AI Assistant",
+                    directAnswer
+                ));
+            }
+        }
+        String profileContext = buildProfileContext(profile);
 
     // Vitamin quick-chip queries (direct dataset lookup)
     if (vitaminKey != null && !vitaminKey.isBlank()) {
@@ -103,7 +137,7 @@ public class VitaminChatService {
     }
 
     if (isClearChatQuery(question)) {
-      return runDirectAiPipeline(question);
+      return runDirectAiPipeline(question, profileContext);
     }
 
     // ===========================================================================
@@ -123,19 +157,24 @@ public class VitaminChatService {
                                 .put("rag", ragAnswer);
                                 logger.info("🧠 FINAL AI PROMPT - Master package being sent:\n{}", finalAgg.encodePrettily());
                         // 4. Final AI synthesis using all context
-                        return synthesizeFinal(retrievalQuery, finalAgg);
+                        return synthesizeFinal(retrievalQuery, finalAgg, profileContext);
                     });
                 })
             );
         });
-    }
+    }).recover(err -> {
+        // Safety net: If the database fails to fetch the profile, log it and run without it
+        System.err.println("Failed to fetch user profile for chat: " + err.getMessage());
+        return runDirectAiPipeline(question, "");
+    });
+  }
 
   
   /**
    * Direct generative fallback conversation pipeline.
    */
-  public Future<JsonObject> runDirectAiPipeline(String userMessage) {
-    return callGeminiWithFallback(userMessage)
+  public Future<JsonObject> runDirectAiPipeline(String userMessage, String profileContext) {
+    return callGeminiWithFallback(getEffectiveSystemPrompt(profileContext), userMessage)
       .map(aiResponse -> {
         String safeAi = sanitizeLimitedHtml(aiResponse);
         return withImageAndDefinition(
@@ -158,7 +197,7 @@ public class VitaminChatService {
                 "Question: \"" + question + "\"\n" +
                 "Food name:";
                 
-        return aiCaller.apply(rescuePrompt).map(response -> {
+        return aiCaller.apply(SYSTEM_PROMPT,rescuePrompt).map(response -> {
             String cleaned = response.trim().toLowerCase();
             // If the AI says NONE, or if it returns garbage, we return null
             if (cleaned.contains("none") || cleaned.isEmpty() || cleaned.length() > 50) {
@@ -223,7 +262,7 @@ public class VitaminChatService {
          System.out.println("📚 RAG SEARCH - Prompt sent to RAG:\n" + ragPrompt);
         return ragService.query(ragPrompt);
     }
-        private Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage) {
+        private Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage,String profileContext) {
         String ragAnswer = masterPackage.getString("rag", "");
         
         // 1. Truncate RAG answer ONLY if it's a massive document (to prevent Groq 413 crashes).
@@ -237,19 +276,27 @@ public class VitaminChatService {
         String localStr = masterPackage.getJsonArray("local") != null ? masterPackage.getJsonArray("local").encode() : "None";
         String usdaStr = masterPackage.getJsonObject("usda") != null ? masterPackage.getJsonObject("usda").encode() : "None";
 
-        // 3. Ultra-compact prompt to save tokens
-        String prompt = "You are a strict nutrition assistant. Answer the user's question using ONLY the provided data. " +
-                "If the provided data is empty, or if the question is completely unrelated to food/nutrition, " +
-                "you MUST reply with EXACTLY this phrase and nothing else: 'I am a nutritional assistant and only answer food-related or descriptive nutrition questions.'\n\n" +
-                "Q: " + rq.getOriginalQuestion() + "\n" +
-                "Local: " + localStr + "\n" +
-                "USDA: " + usdaStr + "\n" +
-                "RAG: " + ragAnswer + "\n" +
-                "Reply concisely.";
+        
+    // 2. 🚨 TOKEN FIX: Truncate Local and USDA JSONs to prevent crashes!
+        if (localStr.length() > 1500) localStr = localStr.substring(0, 1500) + "... [truncated]";
+        if (usdaStr.length() > 1500) usdaStr = usdaStr.substring(0, 1500) + "... [truncated]";
+
+            // 3. Smart prompt: Keeps strict rules but allows profile and general nutrition questions
+         String prompt = "You are a strict nutrition assistant. " +
+            "1. If the question asks about the user's profile, health conditions, or 'who am I', answer using the USER PROFILE CONTEXT provided in your system instructions. " +
+            "2. If the question is about specific foods, answer using ONLY the provided data below. " +
+            "3. If the question is about general nutrition or diet advice, use your general medical knowledge and the user's profile context. " +
+            "4. If the provided data is empty AND the question is completely unrelated to food, nutrition, health, or the user's profile (e.g., math, weather, programming), " +
+            "you MUST reply with EXACTLY this phrase and nothing else: 'I am a nutritional assistant and only answer food-related or descriptive nutrition questions.'\n\n" +
+            "Q: " + rq.getOriginalQuestion() + "\n" +
+            "Local: " + localStr + "\n" +
+            "USDA: " + usdaStr + "\n" +
+            "RAG: " + ragAnswer + "\n" +
+            "Reply concisely.";
             
         System.out.println("🧠 FINAL AI PROMPT - Exact text sent to AI:\n" + prompt);
         
-        return aiCaller.apply(prompt).map(aiAnswer -> {
+        return aiCaller.apply(getEffectiveSystemPrompt(profileContext),prompt).map(aiAnswer -> {
             // After obtaining clean text answer, format final UI payload.
             String safeAnswer = sanitizeLimitedHtml(aiAnswer);
             return withImageAndDefinition(new JsonObject(), null, "NutritionGuard AI Assistant", safeAnswer);
@@ -369,19 +416,19 @@ public class VitaminChatService {
     }
 
   // Gemini API helpers & Multi-model Fallback Loops
-    private Future<String> callGeminiWithFallback(String prompt) {
-    return callGemini("gemini-2.5-flash", prompt)
+    private Future<String> callGeminiWithFallback(String systemPrompt, String userPrompt) {
+    return callGemini("gemini-2.5-flash", systemPrompt,userPrompt)
       .recover(err -> {
           // 🚨 PRINT THE EXACT GEMINI ERROR HERE
           System.out.println("🚨 Primary model (Gemini) failed: " + err.getMessage());
           System.out.println("Switching to Groq...");
-          return callGroq("llama-3.3-70b-versatile", prompt);
+          return callGroq("llama-3.3-70b-versatile",systemPrompt, userPrompt);
       })
       .recover(err -> {
           // 🚨 PRINT THE EXACT GROQ ERROR HERE
           System.out.println("🚨 Groq model failed: " + err.getMessage());
           System.out.println("Switching to LM Studio...");
-          return callLmStudio(prompt);
+          return callLmStudio(systemPrompt, userPrompt);
       })
       .recover(err -> {
           System.out.println("🚨 LM Studio model failed: " + err.getMessage());
@@ -392,7 +439,7 @@ public class VitaminChatService {
       });
   }
 
-  private Future<String> callGroq(String model, String userPrompt) {
+  private Future<String> callGroq(String model,  String systemPrompt, String userPrompt) {
     String apiKey = config.groqApiKey();
     if (apiKey == null || apiKey.isBlank()) {
       return Future.failedFuture("Missing GROQ_API_KEY");
@@ -404,7 +451,7 @@ public class VitaminChatService {
     JsonObject requestBody = new JsonObject()
       .put("model", model)
       .put("messages", new JsonArray()
-        .add(new JsonObject().put("role", "system").put("content", SYSTEM_PROMPT))
+        .add(new JsonObject().put("role", "system").put("content", systemPrompt))
         .add(new JsonObject().put("role", "user").put("content", prompt))
       )
             .put("temperature", 0.4)
@@ -451,9 +498,9 @@ public class VitaminChatService {
     return message.getString("content");
   }
 
-  private Future<String> callLmStudio(String userPrompt) {
+  private Future<String> callLmStudio(String systemPrompt,String userPrompt) {
     String endpoint = "http://127.0.0.1:1234/api/v1/chat";
-    String prompt = userPrompt == null ? "" : userPrompt;
+    String prompt = (systemPrompt == null ? "" : systemPrompt) + "\n\nUser: " + (userPrompt == null ? "" : userPrompt);
 
     JsonObject requestBody = new JsonObject()
       .put("model", "google/gemma-4-e4b")
@@ -513,7 +560,7 @@ public class VitaminChatService {
     return null;
   }
 
-  private Future<String> callGemini(String model, String userPrompt) {
+  private Future<String> callGemini(String model,  String systemPrompt,String userPrompt) {
     String apiKey = config.geminiApiKey();
     if (apiKey == null || apiKey.isBlank()) {
       return Future.failedFuture("Missing GEMINI_API_KEY");
@@ -525,7 +572,7 @@ public class VitaminChatService {
 
     JsonObject requestBody = new JsonObject()
       .put("systemInstruction", new JsonObject()
-        .put("parts", new JsonArray().add(new JsonObject().put("text", SYSTEM_PROMPT)))
+        .put("parts", new JsonArray().add(new JsonObject().put("text", systemPrompt)))
       )
       .put("contents", new JsonArray().add(new JsonObject()
         .put("role", "user")
@@ -664,7 +711,7 @@ public class VitaminChatService {
     if (lower.isEmpty()) return false;
 
     String[] chatPatterns = {
-      "who is", "who are", 
+      "who is", "who are", "who am i", "what do you know about me", "my profile", "my health", 
       "how old are you", "where are you", "what can you do",
       "who created you", "who made you", "what is your name",
       "thank you", "thanks", "you're welcome",
@@ -1014,5 +1061,77 @@ public class VitaminChatService {
       .replace(">", "&gt;")
       .replace("\"", "&quot;")
       .replace("'", "&#39;");
+  }
+              
+        // ... (paste the rest of your original method logic here) ...
+        private String buildProfileContext(JsonObject profile) {
+    if (profile == null || profile.isEmpty()) return "";
+
+    System.out.println("=== DEBUG: PROFILE JSON CONTENT ===");
+    System.out.println(profile.encodePrettily());
+    System.out.println("===================================");
+    
+    StringBuilder sb = new StringBuilder("\n\n### USER PROFILE CONTEXT:\n");
+
+    // Name and Email
+    if (profile.getString("name") != null) sb.append("- Name: ").append(profile.getString("name")).append("\n");
+    if (profile.getString("email") != null) sb.append("- Email: ").append(profile.getString("email")).append("\n");
+    
+    // Basic Stats (Using the correct keys and Double types from your debug log)
+    if (profile.getInteger("age") != null) sb.append("- Age: ").append(profile.getInteger("age")).append("\n");
+    if (profile.getString("gender") != null) sb.append("- Gender: ").append(profile.getString("gender")).append("\n");
+    if (profile.getDouble("height_cm") != null) sb.append("- Height: ").append(profile.getDouble("height_cm")).append(" cm\n");
+    if (profile.getDouble("weight_kg") != null) sb.append("- Weight: ").append(profile.getDouble("weight_kg")).append(" kg\n");
+    if (profile.getString("activity_level") != null) sb.append("- Activity Level: ").append(profile.getString("activity_level")).append("\n");
+    if (profile.getString("goal") != null) sb.append("- Primary Goal: ").append(profile.getString("goal")).append("\n");
+    
+    // Parse the health_metadata JsonObject to find conditions that are TRUE
+    JsonObject healthMeta = profile.getJsonObject("health_metadata");
+    List<String> activeConditions = new ArrayList<>();
+    
+    if (healthMeta != null) {
+        for (String conditionKey : healthMeta.fieldNames()) {
+            if (healthMeta.getBoolean(conditionKey, false)) {
+                activeConditions.add(formatConditionName(conditionKey));
+            }
+        }
+    }
+    
+    if (!activeConditions.isEmpty()) {
+        sb.append("- Health Conditions: ").append(String.join(", ", activeConditions)).append("\n");
+    } else {
+        sb.append("- Health Conditions: None reported.\n"); 
+    }
+    
+    return sb.toString();
+  }
+
+  // Helper method to make the JSON keys readable for the AI
+  private String formatConditionName(String key) {
+      return switch (key) {
+          case "low_bp" -> "Low Blood Pressure";
+          case "high_bp" -> "High Blood Pressure";
+          case "high_cholesterol" -> "High Cholesterol";
+          case "heart_disease" -> "Heart Disease";
+          case "kidney_disease" -> "Kidney Disease";
+          default -> key.replace("_", " "); 
+      };
+  }
+
+  private String getEffectiveSystemPrompt(String profileContext) {
+    if (profileContext == null || profileContext.isBlank()) {
+      return SYSTEM_PROMPT;
+    }
+    
+    return SYSTEM_PROMPT + profileContext + 
+      "\n\n### BEHAVIORAL INSTRUCTIONS:\n" +
+      "1. IDENTITY QUESTIONS: If the user asks 'who am I?', 'what is my name?', or 'what is my email?', " +
+      "you MUST answer using their Name and Email provided in the USER PROFILE CONTEXT above.\n" +
+      "2. PERSONALIZATION: Always personalize your responses using the user's profile when it is available.\n" +
+      "3. MEDICAL CONDITIONS: You MUST strictly factor in the user's 'Health Conditions' when giving food recommendations. " +
+      "If a food conflicts with a condition, warn the user and suggest an alternative.\n" +
+      "4. MISSING DATA: If specific profile information (like allergies or conditions) is missing from the context, " +
+      "answer generally regarding those aspects and DO NOT make assumptions or guess.\n" +
+      "5. SCOPE: For all other topics, strictly only answer food, nutrition, and diet-related questions.\n";
   }
 }

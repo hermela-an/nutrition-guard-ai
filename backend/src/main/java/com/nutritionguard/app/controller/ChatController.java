@@ -26,6 +26,12 @@ public class ChatController {
     router.post("/api/chat/ask").handler(ctx -> {
       String userId = ctx.get("user_id");
       JsonObject body = ctx.body().asJsonObject();
+
+       // 1. Attach the userId to the body so the Event Bus consumer can read it!
+      if (userId != null) {
+          body.put("user_id", userId); 
+      }
+
       String question = body == null ? "" : body.getString("question", "");
 
       maybeNotifyChatAlert(userId, question);
