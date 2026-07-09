@@ -23,7 +23,7 @@ export interface VerifyEmailResponse {
 export class AuthService {
   constructor(private readonly api: ApiService) {}
 
-  register(email: string, password: string, fullName?: string) {
+  register(email: string, password: string, fullName: string) {
     return this.api.post<RegisterResponse>('/api/auth/register', { email, password, fullName });
   }
 
