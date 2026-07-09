@@ -30,45 +30,46 @@ public class UserRepository {
     if (bootstrap != null) return bootstrap;
     synchronized (this) {
       if (bootstrap != null) return bootstrap;
+      // Build a sequential DDL chain. Each step completes before the next starts.
+      Future<Void> ddlChain = db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'USER',
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          is_verified BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          full_name TEXT
+        );
+        """)
+        .compose(v -> db.execute("""
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
+        """))
+        .compose(v -> db.execute("""
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (email);
+        """))
+        .compose(v -> db.execute("""
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM pg_constraint
+              WHERE conname = 'chk_users_role_valid'
+                AND conrelid = 'public.users'::regclass
+            ) THEN
+              ALTER TABLE public.users
+                ADD CONSTRAINT chk_users_role_valid
+                CHECK (role IN ('USER', 'ADMIN'));
+            END IF;
+          END
+          $$;
+        """))
+        .mapEmpty();
 
-      String ddl = """
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'USER',
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        is_verified BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-
-      ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS password_hash TEXT,
-        ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'USER',
-        ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        ADD COLUMN IF NOT EXISTS full_name TEXT;
-
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (email);
-
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'chk_users_role_valid'
-            AND conrelid = 'public.users'::regclass
-        ) THEN
-          ALTER TABLE public.users
-            ADD CONSTRAINT chk_users_role_valid
-            CHECK (role IN ('USER', 'ADMIN'));
-        END IF;
-      END
-      $$;
-      """;
-
-      bootstrap = db.execute(ddl);
+      // Store the future so subsequent calls reuse the same promise.
+      bootstrap = ddlChain;
       return bootstrap;
     }
   }
@@ -93,10 +94,10 @@ public class UserRepository {
     String sql = """
       INSERT INTO users (id, email, password_hash, role, is_verified, full_name)
       VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, email, role, is_active, is_verified, created_at
+      RETURNING id, email, role, is_active, is_verified, created_at, full_name
       """;
     return ensureSchema().compose(ignored ->
-      db.query(sql, Tuple.of(id, email, passwordHash, normalizedRole, isVerified))
+      db.query(sql, Tuple.of(id, email, passwordHash, normalizedRole, isVerified,fullName))
         .map(rows -> {
           Row row = rows.iterator().next();
           return new JsonObject()
