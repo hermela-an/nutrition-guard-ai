@@ -10,7 +10,11 @@ $envDocker = Join-Path $PSScriptRoot ".env"
 
 if ($Db -eq "auto") {
   # Prefer local Postgres for consistency; fall back to Docker only if no local env is present.
-  $Db = (Test-Path $envLocal) ? "local" : "docker"
+  if (Test-Path $envLocal) {
+    $Db = "local"
+  } else {
+    $Db = "docker"
+  }
 }
 
 if ($Db -eq "docker") {

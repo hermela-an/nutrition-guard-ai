@@ -35,11 +35,13 @@ interface MealSuggestion {
 }
 
 interface MealPlanItem {
+  id?: number;
   food_name: string;
   calories: number;
   portion_amount?: number | null;
   portion_unit?: string | null;
   traffic_light?: string;
+  eaten?: boolean;
 }
 
 interface MealPlanResponse {
@@ -135,6 +137,7 @@ export class NutritionPlanComponent implements OnInit {
           this.constraints = this.buildConstraints(profile.health_metadata ?? {}, profile.goal);
           this.mealSuggestions = this.buildMealSuggestionsFromPlan(mealPlan);
           this.progress.calories.target = targets.target_calories;
+          this.progress.calories.current = this.calculateConsumedCalories(mealPlan);
           this.cdr.detectChanges();
         } catch (e) {
           this.targets = null;
@@ -416,6 +419,49 @@ export class NutritionPlanComponent implements OnInit {
       return Number(value);
     }
     return 0;
+  }
+
+  private calculateConsumedCalories(plan: MealPlanResponse): number {
+    const today = new Date().toISOString().slice(0, 10);
+    const storage = this.readLocalIntake(today);
+    
+    let total = 0;
+    
+    const processMeal = (items: MealPlanItem[] | undefined, mealType: string) => {
+      if (!items) return;
+      for (const item of items) {
+        if (!item.id) continue;
+        const key = `${mealType}:${item.id}`;
+        // Local storage takes precedence for immediate UI feedback, fallback to backend's "eaten" boolean
+        let isEaten = item.eaten;
+        if (storage[key] === true) isEaten = true;
+        else if (storage[key] === false) isEaten = false;
+        
+        if (isEaten) {
+          total += item.calories;
+        }
+      }
+    };
+
+    processMeal(plan.breakfast, 'breakfast');
+    processMeal(plan.lunch, 'lunch');
+    processMeal(plan.dinner, 'dinner');
+    processMeal(plan.snacks, 'snack');
+
+    return total;
+  }
+
+  private readLocalIntake(date: string): Record<string, boolean> {
+    const key = `ng:intake:daily:${date}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, boolean>;
+      return {};
+    } catch {
+      return {};
+    }
   }
 
   getProgressPercentage(data: { current: number; target: number }): number {

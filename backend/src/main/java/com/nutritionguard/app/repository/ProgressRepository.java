@@ -29,23 +29,71 @@ public class ProgressRepository {
   }
 
   public Future<JsonArray> history(String userId) {
-    String sql = """
+    String historySql = """
       SELECT log_date, weight_kg, consumed
       FROM daily_logs
       WHERE user_id = $1
       ORDER BY log_date ASC
       LIMIT 90
       """;
-    return db.query(sql, Tuple.of(userId))
-      .map(rows -> {
-        JsonArray history = new JsonArray();
-        for (Row row : rows) {
-          history.add(new JsonObject()
-            .put("log_date", row.getLocalDate("log_date").toString())
-            .put("weight_kg", row.getDouble("weight_kg"))
-            .put("consumed", RowJsonUtil.getJsonObject(row, "consumed")));
+      
+    String intakeSql = """
+         SELECT dmi.intake_date, SUM(fi.calories_kcal)::int as calculated_calories
+      FROM daily_meal_intake dmi
+      JOIN food_items fi ON dmi.food_item_id = fi.id
+      WHERE dmi.user_id = $1 AND dmi.eaten = true
+      GROUP BY dmi.intake_date
+      """;
+
+    return db.query(historySql, Tuple.of(userId)).compose(historyRows -> 
+      db.query(intakeSql, Tuple.of(userId)).map(intakeRows -> {
+        java.util.Map<String, Integer> intakeMap = new java.util.HashMap<>();
+        for (Row row : intakeRows) {
+          intakeMap.put(row.getLocalDate("intake_date").toString(), row.getInteger("calculated_calories"));
         }
-        return history;
-      });
+
+        JsonArray historyArray = new JsonArray();
+        java.util.Map<String, JsonObject> mergedMap = new java.util.HashMap<>();
+
+        for (Row row : historyRows) {
+          String dateStr = row.getLocalDate("log_date").toString();
+          JsonObject consumed = RowJsonUtil.getJsonObject(row, "consumed");
+          if (consumed == null) consumed = new JsonObject();
+          
+          JsonObject item = new JsonObject()
+            .put("log_date", dateStr)
+            .put("weight_kg", row.getDouble("weight_kg"))
+            .put("consumed", consumed);
+          
+          mergedMap.put(dateStr, item);
+          historyArray.add(item);
+        }
+
+        for (java.util.Map.Entry<String, Integer> entry : intakeMap.entrySet()) {
+          String dateStr = entry.getKey();
+          Integer calcCal = entry.getValue();
+          if (calcCal == null || calcCal <= 0) continue;
+
+          if (mergedMap.containsKey(dateStr)) {
+            mergedMap.get(dateStr).getJsonObject("consumed").put("calories", calcCal);
+          } else {
+            JsonObject consumed = new JsonObject().put("calories", calcCal);
+            JsonObject item = new JsonObject()
+              .put("log_date", dateStr)
+              .put("weight_kg", 0.0)
+              .put("consumed", consumed);
+            historyArray.add(item);
+          }
+        }
+
+        java.util.List<JsonObject> list = new java.util.ArrayList<>();
+        for (int i = 0; i < historyArray.size(); i++) {
+          list.add(historyArray.getJsonObject(i));
+        }
+        list.sort((a, b) -> a.getString("log_date").compareTo(b.getString("log_date")));
+
+        return new JsonArray(list);
+      })
+    );
   }
 }

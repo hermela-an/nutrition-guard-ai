@@ -74,8 +74,8 @@ public class ProfileRepository {
       .put("activity_level", row.getString("activity_level"))
       .put("goal", row.getString("goal"))
       .put("health_metadata", healthMetadata)
-      .put("name", row.getString("name"))
-      .put("email", row.getString("email"));
+      .put("name", row.getColumnIndex("name") != -1 ? row.getString("name") : null)
+      .put("email", row.getColumnIndex("email") != -1 ? row.getString("email") : null);
   }
 
   private Integer asInt(JsonObject obj, String key) {

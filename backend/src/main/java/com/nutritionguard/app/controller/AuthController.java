@@ -87,16 +87,21 @@ public class AuthController {
 
   private io.vertx.core.Future<JsonObject> request(String address, JsonObject body) {
     return vertx.eventBus()
-      .<JsonObject>request(address, body, new DeliveryOptions().setSendTimeout(5_000))
+      .<JsonObject>request(address, body, new DeliveryOptions().setSendTimeout(15_000))
       .map(msg -> msg.body());
   }
 
   private int statusFrom(Throwable err, int fallback) {
     if (err instanceof ReplyException re) {
-      return re.failureCode();
+        int code = re.failureCode();
+        // FIX: Validate that the code is a valid HTTP status code (100-599)
+        // Vert.x returns -1 on timeout, which is invalid
+        if (code >= 100 && code <= 599) {
+            return code;
+        }
     }
     return fallback;
-  }
+}
 
   private String messageFrom(Throwable err) {
     if (err instanceof ReplyException re) {

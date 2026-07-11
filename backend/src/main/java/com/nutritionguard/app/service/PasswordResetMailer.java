@@ -29,6 +29,7 @@ public class PasswordResetMailer {
       .setHostname(host)
       .setPort(port)
       .setTrustAll(true)
+      .setAuthMethods("PLAIN LOGIN")
       .setStarttls(startTls ? io.vertx.ext.mail.StartTLSOptions.REQUIRED : io.vertx.ext.mail.StartTLSOptions.DISABLED);
 
     if (!isBlank(config.smtpUsername())) {
