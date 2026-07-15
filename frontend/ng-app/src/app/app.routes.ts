@@ -15,11 +15,11 @@ import { DailyMealPlanComponent } from './features/daily-meal-plan/daily-meal-pl
 import { ProgressTrackingComponent } from './features/progress-tracking/progress-tracking.component';
 import { FoodSearchComponent } from './features/food-search/food-search.component';
 import { NotificationsComponent } from './features/notifications/notifications.component';
-import { AdminDashboardComponent } from './features/admin/admin-dashboard.component';
+import { AdminDashboardComponent } from './features/admin/admin-dashboard/admin-dashboard.component';
 import { AdminLayoutComponent } from './features/admin/admin-layout.component';
-import { AdminOverviewComponent } from './features/admin/admin-overview.component';
-import { AdminUsersComponent } from './features/admin/admin-users.component';
-import { AdminAlertsComponent } from './features/admin/admin-alerts.component';
+import { AdminOverviewComponent } from './features/admin/admin-overview/admin-overview.component';
+import { AdminUsersComponent } from './features/admin/admin-users/admin-users.component';
+import { AdminAlertsComponent } from './features/admin/admin-alerts/admin-alerts.component';
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },

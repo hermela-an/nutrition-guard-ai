@@ -34,6 +34,7 @@ public class MealPlanController {
         if (profile == null) {
           return io.vertx.core.Future.failedFuture("Profile not found");
         }
+        // Ask the **event‑bus** to produce a meal plan for that profile
         return vertx.eventBus().<io.vertx.core.json.JsonObject>request(EventAddresses.FILTER_MEAL_PLAN, profile)
           .map(msg -> msg.body());
       }).compose(plan -> tracking.saveRecommendations(userId, today, plan).map(plan))

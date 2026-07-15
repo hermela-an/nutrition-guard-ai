@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { finalize, timeout } from 'rxjs/operators';
-import { AdminFoodsService, AdminFoodItem } from '../../core/services/admin-foods.service';
-import { AdminUsersService, AdminUser } from '../../core/services/admin-users.service';
+import { AdminFoodsService, AdminFoodItem } from '../../../core/services/admin-foods.service';
+import { AdminUsersService, AdminUser } from '../../../core/services/admin-users.service';
 
 export type AlertLevel = 'info' | 'warning' | 'error';
 export type AlertCategory = 'user' | 'food' | 'system';

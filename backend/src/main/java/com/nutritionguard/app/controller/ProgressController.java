@@ -11,13 +11,14 @@ public class ProgressController {
   }
 
   public void mount(Router router) {
+     // Saving a New Progress Log
     router.post("/api/progress/logs").handler(ctx -> {
       String userId = ctx.get("user_id");
       progress.log(userId, ctx.body().asJsonObject())
         .onSuccess(v -> ctx.response().setStatusCode(201).end())
         .onFailure(err -> ctx.response().setStatusCode(400).end(err.getMessage()));
     });
-
+        // Fetching Past Progress History
     router.get("/api/progress/history").handler(ctx -> {
       String userId = ctx.get("user_id");
       progress.history(userId)

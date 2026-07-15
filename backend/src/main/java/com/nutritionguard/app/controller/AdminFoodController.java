@@ -83,7 +83,7 @@ public class AdminFoodController {
         ctx.fail(t);
       }
     });
-
+      //Admin API endpoint to fetch a paginated and searchable list of foods.
     router.get("/api/admin/foods").handler(ctx -> {
       try {
         String q = ctx.request().getParam("q");

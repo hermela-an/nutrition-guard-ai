@@ -2,9 +2,9 @@ import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { finalize, timeout } from 'rxjs/operators';
-import { AdminUser, AdminUsersService } from '../../core/services/admin-users.service';
-import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-import { ToastService } from '../../shared/services/toast.service';
+import { AdminUser, AdminUsersService } from '../../../core/services/admin-users.service';
+import { ConfirmDialogService } from '../../../shared/services/confirm-dialog.service';
+import { ToastService } from '../../../shared/services/toast.service';
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 

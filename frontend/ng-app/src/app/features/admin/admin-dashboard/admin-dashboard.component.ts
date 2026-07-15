@@ -3,9 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { finalize, timeout } from 'rxjs/operators';
-import { AdminFoodItem, AdminFoodsService } from '../../core/services/admin-foods.service';
-import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-import { ToastService } from '../../shared/services/toast.service';
+import { AdminFoodItem, AdminFoodsService } from '../../../core/services/admin-foods.service';
+import { ConfirmDialogService } from '../../../shared/services/confirm-dialog.service';
+import { ToastService } from '../../../shared/services/toast.service';
 
 type TrafficLight = 'SAFE' | 'CAUTION' | 'AVOID';
 type FilterAll = 'ALL' | TrafficLight;

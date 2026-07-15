@@ -1,9 +1,9 @@
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { finalize, timeout } from 'rxjs/operators';
-import { AdminFoodsService, AdminFoodItem } from '../../core/services/admin-foods.service';
-import { AdminStatsService, AdminStats } from '../../core/services/admin-stats.service';
-import { AdminAnalyticsService, FoodSearchDay } from '../../core/services/admin-analytics.service';
+import { AdminFoodsService, AdminFoodItem } from '../../../core/services/admin-foods.service';
+import { AdminStatsService, AdminStats } from '../../../core/services/admin-stats.service';
+import { AdminAnalyticsService, FoodSearchDay } from '../../../core/services/admin-analytics.service';
 
 @Component({
   standalone: true,

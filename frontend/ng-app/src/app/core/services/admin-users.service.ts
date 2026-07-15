@@ -18,8 +18,8 @@ export interface AdminUsersResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
-  constructor(private readonly api: ApiService, private readonly auth: AuthService) {}
-
+  constructor(private readonly api: ApiService, private readonly auth: AuthService) { }
+  //"Fallback" Safety Nets 
   list(opts?: { q?: string; status?: 'ACTIVE' | 'INACTIVE' | 'ALL'; limit?: number; offset?: number }): Observable<AdminUsersResponse> {
     const q = encodeURIComponent((opts?.q ?? '').trim());
     const status = encodeURIComponent((opts?.status ?? 'ALL').toString());
