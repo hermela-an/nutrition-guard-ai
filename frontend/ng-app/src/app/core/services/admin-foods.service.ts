@@ -27,7 +27,7 @@ export interface AdminFoodItem {
   image_url?: string | null;
   category?: string | null;
   definition?: string | null;
-  health_effect?: Record<string, 'good' | 'neutral' | 'bad' | string> | null;
+  health_effect?: Record<string, 'good' | 'neutral' | 'caution' | 'bad' | string> | null;
   traffic_light?: 'SAFE' | 'CAUTION' | 'AVOID' | string;
 }
 

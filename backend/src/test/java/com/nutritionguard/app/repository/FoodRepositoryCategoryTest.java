@@ -21,7 +21,7 @@ public class FoodRepositoryCategoryTest {
     assertEquals("Nuts and Seeds", normalize.invoke(repo, "nuts"));
     assertEquals("Carbohydrates", normalize.invoke(repo, "carbs"));
     assertEquals("Vegetables", normalize.invoke(repo, "unknown-category"));
-    assertEquals("Vegetables", normalize.invoke(repo, null));
+    assertEquals("Vegetables", normalize.invoke(repo, new Object[]{null}));
   }
 }
 

@@ -28,6 +28,7 @@ public class EmailVerificationMailer {
     MailConfig mailConfig = new MailConfig()
       .setHostname(host)
       .setPort(port)
+      .setConnectTimeout(5000)
       .setTrustAll(true)
       .setAuthMethods("PLAIN LOGIN")
       .setStarttls(startTls ? io.vertx.ext.mail.StartTLSOptions.REQUIRED : io.vertx.ext.mail.StartTLSOptions.DISABLED);

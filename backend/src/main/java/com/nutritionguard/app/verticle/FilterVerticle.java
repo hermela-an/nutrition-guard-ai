@@ -17,6 +17,8 @@ public class FilterVerticle extends AbstractVerticle {
   @Override
   public void start() {
     FilterService service = new FilterService(new FoodRepository(db));
+    // Listen for the address used by the controller above
+    
     vertx.eventBus().consumer(EventAddresses.FILTER_MEAL_PLAN, msg -> {
       JsonObject profile = (JsonObject) msg.body();
       service.generateMealPlan(profile)

@@ -39,6 +39,6 @@ Summary:"""
         if isinstance(content, list):
             summary = " ".join(str(c) for c in content)
         else:
-            summary = str(content)
+            summary = content
             
         return summary

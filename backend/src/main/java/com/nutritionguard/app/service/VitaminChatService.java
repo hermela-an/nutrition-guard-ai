@@ -51,7 +51,21 @@ public class VitaminChatService {
      private static final String FALLBACK_IMAGE_URL =
     "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=400&q=80";
 
-    public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService, QueryUnderstandingService queryUnderstandingService, ProfileService profileService) {
+    public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService) {
+    this(vertx, config, foods, ragService, new QueryUnderstandingService(config, null), null, (BiFunction<String, String, Future<String>>) null);
+  }
+
+  public VitaminChatService(
+    Vertx vertx,
+    AppConfig config,
+    FoodRepository foods,
+    RagService ragService,
+    java.util.function.Function<String, Future<String>> aiCaller
+  ) {
+    this(vertx, config, foods, ragService, new QueryUnderstandingService(config, aiCaller), null, (sys, prompt) -> aiCaller == null ? null : aiCaller.apply(prompt));
+  }
+
+  public VitaminChatService(Vertx vertx, AppConfig config, FoodRepository foods, RagService ragService, QueryUnderstandingService queryUnderstandingService, ProfileService profileService) {
     this(vertx, config, foods, ragService, queryUnderstandingService, profileService, (BiFunction<String, String, Future<String>>) null); // <-- Notice the cast here
   }
 
@@ -71,6 +85,13 @@ public class VitaminChatService {
     this.queryUnderstandingService = queryUnderstandingService;
     this.profileService = profileService;
     this.aiCaller = aiCaller == null ? this::callGeminiWithFallback : aiCaller;
+  }
+
+  /**
+   * Main entrypoint for chat queries without user session.
+   */
+  public Future<JsonObject> ask(JsonObject body) {
+    return ask(null, body);
   }
 
   /**
@@ -155,7 +176,7 @@ public class VitaminChatService {
                                 .put("local", localCtx != null ? localCtx.getJsonArray("items") : null)
                                 .put("usda", usdaCtx)
                                 .put("rag", ragAnswer);
-                                logger.info("🧠 FINAL AI PROMPT - Master package being sent:\n{}", finalAgg.encodePrettily());
+                                // logger.info("🧠 FINAL AI PROMPT - Master package being sent:\n{}", finalAgg.encodePrettily()); // COMMENTED OUT: logs massive base64 strings (privacy risk)
                         // 4. Final AI synthesis using all context
                         return synthesizeFinal(retrievalQuery, finalAgg, profileContext);
                     });
@@ -262,7 +283,91 @@ public class VitaminChatService {
          System.out.println("📚 RAG SEARCH - Prompt sent to RAG:\n" + ragPrompt);
         return ragService.query(ragPrompt);
     }
-        private Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage,String profileContext) {
+    boolean isImageRequest(String question) {
+        if (question == null) return false;
+        
+        String q = question.toLowerCase().trim();
+        
+        // Single-word patterns with word boundaries
+        if (q.matches(".*\\b(image|images|picture|pictures|photo|photos|pic|pics)\\b.*")) {
+            return true;
+        }
+        
+        // Multi-word phrases
+        if (q.contains("show me") || 
+            q.contains("what does it look like") ||
+            q.contains("look like") ||
+            q.contains("i want to see") ||
+            q.contains("let me see") ||
+            q.contains("visual")) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    JsonObject sanitizeForLLM(JsonObject originalFood) {
+        if (originalFood == null) return new JsonObject();
+        JsonObject safeCopy = originalFood.copy();
+        safeCopy.remove("image_url");
+        safeCopy.remove("imageUrl");
+        safeCopy.remove("image");
+        safeCopy.remove("image_data");
+        return safeCopy;
+    }
+
+    JsonObject resolvePrimaryFood(JsonArray items, String question) {
+        if (items == null || items.isEmpty()) return null;
+        if (items.size() == 1) return items.getJsonObject(0);
+
+        String qLower = question.toLowerCase().trim();
+        List<JsonObject> matches = new ArrayList<>();
+
+        // Priority 1: Exact match — wins immediately, no ambiguity possible
+        for (int i = 0; i < items.size(); i++) {
+            JsonObject item = items.getJsonObject(i);
+            String name = item.getString("food_name", "").toLowerCase().trim();
+            if (name.equals(qLower)) {
+                return item;
+            }
+        }
+
+        // Priority 2: Query contains food name (strong match — min 3 chars)
+        for (int i = 0; i < items.size(); i++) {
+            JsonObject item = items.getJsonObject(i);
+            String name = item.getString("food_name", "").toLowerCase().trim();
+            if (!name.isEmpty() && qLower.contains(name) && name.length() >= 3) {
+                matches.add(item);
+            }
+        }
+
+        // Return ONLY if exactly one match — ambiguity = no image
+        if (matches.size() == 1) {
+            return matches.get(0);
+        }
+
+        // Priority 3: Food name contains query (partial match — min 3 chars)
+        // Only attempted if Priority 2 found nothing at all
+        if (matches.isEmpty() && qLower.length() >= 3) {
+            for (int i = 0; i < items.size(); i++) {
+                JsonObject item = items.getJsonObject(i);
+                String name = item.getString("food_name", "").toLowerCase().trim();
+                if (!name.isEmpty() && name.contains(qLower)) {
+                    matches.add(item);
+                }
+            }
+
+            // Return ONLY if exactly one partial match — ambiguity = no image
+            if (matches.size() == 1) {
+                return matches.get(0);
+            }
+        }
+
+        // Multiple matches or zero matches → null (better to show no image than wrong image)
+        return null;
+    }
+
+    Future<JsonObject> synthesizeFinal(RetrievalQuery rq, JsonObject masterPackage, String profileContext) {
         String ragAnswer = masterPackage.getString("rag", "");
         
         // 1. Truncate RAG answer ONLY if it's a massive document (to prevent Groq 413 crashes).
@@ -271,22 +376,48 @@ public class VitaminChatService {
             ragAnswer = ragAnswer.substring(0, 2000) + "... [truncated]";
         }
 
-        // 2. Use .encode() instead of .encodePrettily() to remove all whitespace and save thousands of tokens!
-        // AI models don't need pretty spacing, they just need the raw data.
-        String localStr = masterPackage.getJsonArray("local") != null ? masterPackage.getJsonArray("local").encode() : "None";
-        String usdaStr = masterPackage.getJsonObject("usda") != null ? masterPackage.getJsonObject("usda").encode() : "None";
-
+        // 1. Sanitize local food items BEFORE encoding (removes massive base64 strings)
+        JsonArray sanitizedLocal = new JsonArray();
+        JsonArray localItems = masterPackage.getJsonArray("local");
+        if (localItems != null) {
+            for (int i = 0; i < localItems.size(); i++) {
+                sanitizedLocal.add(sanitizeForLLM(localItems.getJsonObject(i)));
+            }
+        }
         
-    // 2. 🚨 TOKEN FIX: Truncate Local and USDA JSONs to prevent crashes!
-        if (localStr.length() > 1500) localStr = localStr.substring(0, 1500) + "... [truncated]";
-        if (usdaStr.length() > 1500) usdaStr = usdaStr.substring(0, 1500) + "... [truncated]";
+        // 2. Extract image URL ONLY for explicit image requests
+        String extractedImageUrl = null;
+        if (isImageRequest(rq.getOriginalQuestion())) {
+            JsonObject primaryFood = resolvePrimaryFood(localItems, rq.getOriginalQuestion());
+            if (primaryFood != null) {
+                String rawImg = primaryFood.getString("image_url");
+                if (rawImg != null && !rawImg.isBlank()) {
+                    extractedImageUrl = rawImg;
+                }
+            }
+        }
+        final String imageUrlToReturn = extractedImageUrl;
 
-            // 3. Smart prompt: Keeps strict rules but allows profile and general nutrition questions
-         String prompt = "You are a strict nutrition assistant. " +
+        // 3. Encode sanitized data
+        String localStr = !sanitizedLocal.isEmpty() ? sanitizedLocal.encode() : "None";
+        String usdaStr = masterPackage.getJsonObject("usda") != null ? 
+                         masterPackage.getJsonObject("usda").encode() : "None";
+
+        // 4. Apply conservative truncation AFTER sanitization to keep context bounded
+        if (localStr.length() > 8000) {
+            localStr = localStr.substring(0, 8000) + "... [truncated for length]";
+        }
+        if (usdaStr.length() > 8000) {
+            usdaStr = usdaStr.substring(0, 8000) + "... [truncated for length]";
+        }
+
+        // 5. Updated prompt with explicit rule against generating base64/image URLs
+        String prompt = "You are a strict nutrition assistant. " +
             "1. If the question asks about the user's profile, health conditions, or 'who am I', answer using the USER PROFILE CONTEXT provided in your system instructions. " +
             "2. If the question is about specific foods, answer using ONLY the provided data below. " +
             "3. If the question is about general nutrition or diet advice, use your general medical knowledge and the user's profile context. " +
-            "4. If the provided data is empty AND the question is completely unrelated to food, nutrition, health, or the user's profile (e.g., math, weather, programming), " +
+            "4. Do NOT output raw image URLs, data URIs, or Base64 image data in your text. The application interface automatically displays the image to the user. If the user asks for an image, acknowledge it naturally (e.g., 'Here is the image of [Food Name]'). Provide only helpful descriptive and nutritional information. " +
+            "5. If the provided data is empty AND the question is completely unrelated to food, nutrition, health, or the user's profile (e.g., math, weather, programming), " +
             "you MUST reply with EXACTLY this phrase and nothing else: 'I am a nutritional assistant and only answer food-related or descriptive nutrition questions.'\n\n" +
             "Q: " + rq.getOriginalQuestion() + "\n" +
             "Local: " + localStr + "\n" +
@@ -294,16 +425,29 @@ public class VitaminChatService {
             "RAG: " + ragAnswer + "\n" +
             "Reply concisely.";
             
-        System.out.println("🧠 FINAL AI PROMPT - Exact text sent to AI:\n" + prompt);
+        // Privacy/Security: Log summary size instead of raw prompt containing user data
+        System.out.println("🧠 FINAL AI PROMPT generated. Local=" + localStr.length() + " chars, USDA=" + usdaStr.length() + " chars");
         
-        return aiCaller.apply(getEffectiveSystemPrompt(profileContext),prompt).map(aiAnswer -> {
+        return aiCaller.apply(getEffectiveSystemPrompt(profileContext), prompt).map(aiAnswer -> {
             // After obtaining clean text answer, format final UI payload.
             String safeAnswer = sanitizeLimitedHtml(aiAnswer);
-            return withImageAndDefinition(new JsonObject(), null, "NutritionGuard AI Assistant", safeAnswer);
+            
+            // 6. Defense-in-depth: Strip any accidental data URIs or image URL leaks
+            safeAnswer = safeAnswer.replaceAll("data:image/[^;]+;base64,[^\\s\"']+", "[Image data hidden]");
+            safeAnswer = safeAnswer.replaceAll("(?i)image[_\\s]*url[_\\s]*:[^\\n]+", "");
+            safeAnswer = safeAnswer.replaceAll("(?i)image[_\\s]*data[_\\s]*:[^\\n]+", "");
+            
+            return withImageAndDefinition(new JsonObject(), imageUrlToReturn, "NutritionGuard AI Assistant", safeAnswer);
         });
     }
 
         private Future<JsonObject> retrieveUsda(RetrievalQuery rq) {
+        // Fix #3: Skip USDA entirely for image requests — we only need local DB images
+        if (isImageRequest(rq.getOriginalQuestion())) {
+            System.out.println("🖼️ Image request detected — skipping USDA lookup");
+            return Future.succeededFuture(null);
+        }
+
         // 1. Get the extracted foods and nutrients from the main NLU
         List<String> extractedFoods = rq.getUnderstanding().getSearchContext().getFoods();
         List<String> extractedNutrients = rq.getUnderstanding().getSearchContext().getNutrients();
@@ -321,24 +465,24 @@ public class VitaminChatService {
                 if (sb.length() > 0) sb.append(' ');
                 sb.append(String.join(" ", extractedNutrients));
             }
-            
+
             String query = sb.toString();
             System.out.println("🔍 USDA API SEARCH - Query sent to USDA: " + query);
-            
+
             return callUsda(query);
         }
 
         // 3. 🚑 RESCUE TRIGGERED: The NLU found absolutely no foods or nutrients.
         System.out.println("⚠️ NLU found no foods or nutrients for USDA. Triggering Rescue Extraction...");
-        
+
         return rescueExtractFoodName(rq.getOriginalQuestion()).compose(rescuedFood -> {
             if (rescuedFood == null) {
                 System.out.println("🛑 Rescue failed (User likely didn't mention a food). Skipping USDA API.");
                 return Future.succeededFuture(null);
             }
-            
+
             System.out.println("🚑 Rescue SUCCESS for USDA! Found food: " + rescuedFood);
-            
+
             // Now search the USDA API with the rescued food name!
             return callUsda(rescuedFood);
         });
@@ -424,14 +568,16 @@ public class VitaminChatService {
           System.out.println("Switching to Groq...");
           return callGroq("llama-3.3-70b-versatile",systemPrompt, userPrompt);
       })
+      /*
       .recover(err -> {
           // 🚨 PRINT THE EXACT GROQ ERROR HERE
           System.out.println("🚨 Groq model failed: " + err.getMessage());
           System.out.println("Switching to LM Studio...");
           return callLmStudio(systemPrompt, userPrompt);
       })
+      */
       .recover(err -> {
-          System.out.println("🚨 LM Studio model failed: " + err.getMessage());
+          System.out.println("🚨 Models failed: " + err.getMessage());
           System.out.println("Using safe fallback...");
           return Future.succeededFuture(
               "I'm currently experiencing high demand. Please try again shortly, or ask about specific foods or nutrients."

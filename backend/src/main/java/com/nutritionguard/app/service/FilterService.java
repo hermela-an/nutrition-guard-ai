@@ -15,11 +15,10 @@ public class FilterService {
   }
 
   public Future<JsonObject> generateMealPlan(JsonObject profile) {
-    JsonObject health = profile.getJsonObject("health_metadata", new JsonObject());
     String goal = profile.getString("goal", "").toLowerCase();
     boolean preferHighCalories = "weight_gain".equals(goal);
     boolean preferLowCalories = "weight_loss".equals(goal);
-    
+
     return CompositeFuture.all(
       foods.mealCandidates("breakfast"),
       foods.mealCandidates("lunch"),
@@ -33,48 +32,27 @@ public class FilterService {
       response.put("breakfast", processMeal(cf.resultAt(0), profile, preferHighCalories, preferLowCalories, sides));
       response.put("lunch", processMeal(cf.resultAt(1), profile, preferHighCalories, preferLowCalories, sides));
       response.put("dinner", processMeal(cf.resultAt(2), profile, preferHighCalories, preferLowCalories, sides));
-      response.put("snacks", pickSafe(cf.resultAt(3), profile, preferHighCalories, preferLowCalories));
+      response.put("snacks", pickSnacks(cf.resultAt(3), profile, preferHighCalories, preferLowCalories));
       return response;
     });
   }
 
+  /**
+   * Assembles a realistic, cohesive meal:
+   * 1. Selects exactly 1 Primary Main Dish (prioritizing SAFE, falling back to at most 1 CAUTION).
+   * 2. Attaches optional side choices (e.g. Injera, Bread) if the dish is a main food.
+   * 3. Pairs with at most 1 optional complementary vegetable or light side (if available).
+   * 4. Never stacks multiple heavy main entrees (e.g. Instant Noodles + Rice and Salmon).
+   * 5. Strictly excludes any food evaluated as AVOID.
+   */
   private JsonArray processMeal(JsonArray candidates, JsonObject profile, boolean preferHigh, boolean preferLow, JsonArray allSides) {
-    JsonArray selected = pickSafe(candidates, profile, preferHigh, preferLow);
-    for (int i = 0; i < selected.size(); i++) {
-      JsonObject food = selected.getJsonObject(i);
-      if (needsSideFood(food)) {
-        food.put("sides", allSides);
-      }
-    }
-    return selected;
-  }
-
-  private boolean needsSideFood(JsonObject food) {
-    String role = food.getString("food_role", "").toLowerCase();
-    return "main".equals(role) || "main_food".equals(role);
-  }
-
-  private JsonArray pickSafe(JsonArray input, JsonObject profile, boolean preferHigh, boolean preferLow) {
     JsonArray selected = new JsonArray();
-    
-    // 1️⃣ Green foods (primary recommendation)
-    findForLight(input, profile, "SAFE", selected, preferHigh, preferLow);
-    
-    // 2️⃣ Yellow foods (limited / optional)
-    // Only add caution foods if we couldn't find enough safe options
-    if (selected.size() < 3) {
-      findForLight(input, profile, "CAUTION", selected, preferHigh, preferLow);
+    if (candidates == null || candidates.isEmpty()) {
+      return selected;
     }
-    
-    // 3️⃣ Red foods (never auto-recommend)
-    // "AVOID" foods are intentionally excluded and will never be added to the selected array.
-    
-    return selected;
-  }
 
-  private void findForLight(JsonArray input, JsonObject profile, String targetLight, JsonArray results, boolean preferHigh, boolean preferLow) {
     int start = 0;
-    int end = input.size() - 1;
+    int end = candidates.size() - 1;
     int step = 1;
 
     if (preferHigh && !preferLow) {
@@ -83,19 +61,162 @@ public class FilterService {
       step = -1;
     }
 
+    // Phase 1: Select exactly 1 Primary Main Dish (SAFE first, then single best CAUTION fallback)
+    JsonObject primaryMain = null;
+    String primaryLight = null;
+
+    // Search for a SAFE main dish
     for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
-      if (results.size() >= 3) break;
-      
-      JsonObject item = input.getJsonObject(i);
-      // Skip if already added
-      if (containsId(results, item.getInteger("id"))) continue;
+      JsonObject item = candidates.getJsonObject(i);
+      if (!isMainDish(item)) continue;
 
       String light = TrafficLightUtil.evaluateWithProfile(profile, item);
-      if (targetLight.equalsIgnoreCase(light)) {
-        item.put("traffic_light", light);
-        results.add(item);
+      if ("SAFE".equalsIgnoreCase(light)) {
+        primaryMain = item.copy();
+        primaryLight = "SAFE";
+        break;
       }
     }
+
+    // Fallback: If no SAFE main dish exists, select at most 1 CAUTION main dish
+    if (primaryMain == null) {
+      for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+        JsonObject item = candidates.getJsonObject(i);
+        if (!isMainDish(item)) continue;
+
+        String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+        if ("CAUTION".equalsIgnoreCase(light)) {
+          primaryMain = item.copy();
+          primaryLight = "CAUTION";
+          break;
+        }
+      }
+    }
+
+    // If still null (e.g. candidates only had sides/veggies), take any safe candidate
+    if (primaryMain == null) {
+      for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+        JsonObject item = candidates.getJsonObject(i);
+        String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+        if ("SAFE".equalsIgnoreCase(light) || "CAUTION".equalsIgnoreCase(light)) {
+          primaryMain = item.copy();
+          primaryLight = light;
+          break;
+        }
+      }
+    }
+
+    // If a primary dish was identified, add it and attach side options if needed
+    if (primaryMain != null) {
+      primaryMain.put("traffic_light", primaryLight);
+      if (needsSideFood(primaryMain) && allSides != null && !allSides.isEmpty()) {
+        primaryMain.put("sides", allSides);
+      }
+      selected.add(primaryMain);
+    }
+
+    // Phase 2: Pair with at most 1 complementary vegetable or light side (never another heavy entree)
+    if (primaryMain != null) {
+      Integer mainId = primaryMain.getInteger("id");
+      for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+        JsonObject item = candidates.getJsonObject(i);
+        Integer itemId = item.getInteger("id");
+        if (mainId != null && mainId.equals(itemId)) continue;
+
+        // Must be a complementary vegetable or side dish
+        if (!isVegetableOrSide(item)) continue;
+
+        String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+        if ("SAFE".equalsIgnoreCase(light)) {
+          JsonObject sideItem = item.copy();
+          sideItem.put("traffic_light", "SAFE");
+          selected.add(sideItem);
+          break; // At most 1 complementary vegetable/side
+        }
+      }
+    }
+
+    return selected;
+  }
+
+  /**
+   * Selects snack items (1-2 light items), strictly excluding AVOID.
+   */
+  private JsonArray pickSnacks(JsonArray candidates, JsonObject profile, boolean preferHigh, boolean preferLow) {
+    JsonArray selected = new JsonArray();
+    if (candidates == null || candidates.isEmpty()) {
+      return selected;
+    }
+
+    int start = 0;
+    int end = candidates.size() - 1;
+    int step = 1;
+
+    if (preferHigh && !preferLow) {
+      start = end;
+      end = 0;
+      step = -1;
+    }
+
+    // 1. Pick SAFE snacks (up to 2)
+    for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+      if (selected.size() >= 2) break;
+      JsonObject item = candidates.getJsonObject(i);
+      if (containsId(selected, item.getInteger("id"))) continue;
+
+      String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+      if ("SAFE".equalsIgnoreCase(light)) {
+        JsonObject safeCopy = item.copy();
+        safeCopy.put("traffic_light", "SAFE");
+        selected.add(safeCopy);
+      }
+    }
+
+    // 2. Fallback: at most 1 CAUTION snack if no safe snack was found
+    if (selected.isEmpty()) {
+      for (int i = start; step > 0 ? i <= end : i >= end; i += step) {
+        JsonObject item = candidates.getJsonObject(i);
+        String light = TrafficLightUtil.evaluateWithProfile(profile, item);
+        if ("CAUTION".equalsIgnoreCase(light)) {
+          JsonObject cautionCopy = item.copy();
+          cautionCopy.put("traffic_light", "CAUTION");
+          selected.add(cautionCopy);
+          break;
+        }
+      }
+    }
+
+    return selected;
+  }
+
+  private boolean isMainDish(JsonObject food) {
+    if (food == null) return false;
+    String role = food.getString("food_role", "").toLowerCase().trim();
+    if (role.contains("side")) return false;
+
+    String category = food.getString("category", "").toLowerCase().trim();
+    int calories = food.getInteger("calories", food.getInteger("calories_kcal", 0));
+
+    // A low-calorie standalone vegetable dish (e.g. plain spinach, gomen) is treated as a vegetable/side
+    if (category.contains("vegetable") && calories < 200) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private boolean isVegetableOrSide(JsonObject food) {
+    if (food == null) return false;
+    String role = food.getString("food_role", "").toLowerCase().trim();
+    if (role.contains("side")) return true;
+
+    String category = food.getString("category", "").toLowerCase().trim();
+    return category.contains("vegetable");
+  }
+
+  private boolean needsSideFood(JsonObject food) {
+    String role = food.getString("food_role", "").toLowerCase();
+    return "main".equals(role) || "main_food".equals(role);
   }
 
   private boolean containsId(JsonArray array, Integer id) {

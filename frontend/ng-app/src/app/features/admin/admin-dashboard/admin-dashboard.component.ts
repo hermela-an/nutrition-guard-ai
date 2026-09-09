@@ -72,6 +72,7 @@ export class AdminDashboardComponent {
     { value: '', label: '—' },
     { value: 'good', label: 'Good' },
     { value: 'neutral', label: 'Neutral' },
+    { value: 'caution', label: 'Caution' },
     { value: 'bad', label: 'Bad' }
   ] as const;
 
@@ -458,7 +459,7 @@ export class AdminDashboardComponent {
     const out: Record<string, string> = {};
     for (const k of this.healthEffectKeys) {
       const v = (raw[k.key] ?? '').toString().trim().toLowerCase();
-      if (v === 'good' || v === 'neutral' || v === 'bad') {
+      if (v === 'good' || v === 'neutral' || v === 'caution' || v === 'bad') {
         out[k.key] = v;
       }
     }
