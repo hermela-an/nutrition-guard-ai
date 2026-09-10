@@ -560,27 +560,30 @@ public class VitaminChatService {
     }
 
   // Gemini API helpers & Multi-model Fallback Loops
-    private Future<String> callGeminiWithFallback(String systemPrompt, String userPrompt) {
-    return callGemini("gemini-2.5-flash", systemPrompt,userPrompt)
+  private Future<String> callGeminiWithFallback(String systemPrompt, String userPrompt) {
+    return callGemini("gemini-2.5-flash", systemPrompt, userPrompt)
       .recover(err -> {
-          // 🚨 PRINT THE EXACT GEMINI ERROR HERE
           System.out.println("🚨 Primary model (Gemini) failed: " + err.getMessage());
-          System.out.println("Switching to Groq...");
-          return callGroq("llama-3.3-70b-versatile",systemPrompt, userPrompt);
+          System.out.println("Switching to Groq fallback...");
+          return callGroq("llama-3.3-70b-versatile", systemPrompt, userPrompt);
       })
+      /* 
+       * 🚧 TEMPORARILY DISABLED FOR DEPLOYMENT:
+       * LM Studio runs on 127.0.0.1, which does not exist in the cloud.
+       * TODO: Re-enable this later and point it to a cloud-hosted Ollama instance 
+       * (e.g., http://your-ollama-server-ip:11434/v1/chat/completions)
+       */
       /*
       .recover(err -> {
-          // 🚨 PRINT THE EXACT GROQ ERROR HERE
           System.out.println("🚨 Groq model failed: " + err.getMessage());
           System.out.println("Switching to LM Studio...");
           return callLmStudio(systemPrompt, userPrompt);
       })
       */
       .recover(err -> {
-          System.out.println("🚨 Models failed: " + err.getMessage());
-          System.out.println("Using safe fallback...");
+          System.out.println("🚨 All AI fallbacks failed: " + err.getMessage());
           return Future.succeededFuture(
-              "I'm currently experiencing high demand. Please try again shortly, or ask about specific foods or nutrients."
+              "I'm currently experiencing high demand or a temporary service issue. Please try again shortly."
           );
       });
   }

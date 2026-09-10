@@ -58,16 +58,25 @@ public class AppVerticle extends AbstractVerticle {
       ctx.next();
     });
 
-    router.route().handler(CorsHandler.create("*")
-      .allowedMethods(Set.of(
-        io.vertx.core.http.HttpMethod.OPTIONS,
-        io.vertx.core.http.HttpMethod.GET,
-        io.vertx.core.http.HttpMethod.POST,
-        io.vertx.core.http.HttpMethod.PUT,
-        io.vertx.core.http.HttpMethod.DELETE
-      ))
-      .allowedHeader("Content-Type")
-      .allowedHeader("Authorization"));
+    String frontendUrl = System.getenv("FRONTEND_BASE_URL");
+    if (frontendUrl == null || frontendUrl.isBlank()) {
+        frontendUrl = "http://localhost:4200"; // Local Angular fallback
+    }
+
+    CorsHandler corsHandler = CorsHandler.create()
+        .addOrigin(frontendUrl)               // Production Netlify URL
+        .addOrigin("http://localhost:4200")   // Keep localhost for local testing
+        .allowedMethod(io.vertx.core.http.HttpMethod.GET)
+        .allowedMethod(io.vertx.core.http.HttpMethod.POST)
+        .allowedMethod(io.vertx.core.http.HttpMethod.PUT)
+        .allowedMethod(io.vertx.core.http.HttpMethod.DELETE)
+        .allowedMethod(io.vertx.core.http.HttpMethod.OPTIONS)
+        .allowedHeader("Authorization")
+        .allowedHeader("Content-Type")
+        .allowedHeader("Accept")
+        .allowCredentials(true);
+
+    router.route().handler(corsHandler);
     router.route().handler(BodyHandler.create());
 
     // Surface handler exceptions (otherwise clients just see "Internal Server Error" with no context).

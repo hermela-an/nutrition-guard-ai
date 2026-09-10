@@ -22,7 +22,11 @@ public class AdminFoodController {
           return;
         }
 
-        String targetDir = "c:\\project\\NutritionGuard AI\\rag_service\\data";
+        String ragDataDir = System.getenv("RAG_DATA_DIR");
+        if (ragDataDir == null || ragDataDir.isBlank()) {
+            ragDataDir = "c:\\project\\NutritionGuard AI\\rag_service\\data"; // Local fallback
+        }
+        String targetDir = ragDataDir;
         io.vertx.core.file.FileSystem fs = ctx.vertx().fileSystem();
         fs.mkdirsBlocking(targetDir);
 
@@ -35,8 +39,13 @@ public class AdminFoodController {
           fs.moveBlocking(f.uploadedFileName(), targetPath);
         }
 
+        String ragReindexUrl = System.getenv("RAG_REINDEX_URL");
+        if (ragReindexUrl == null || ragReindexUrl.isBlank()) {
+            ragReindexUrl = "http://127.0.0.1:5000/reindex"; // Local fallback
+        }
+
         io.vertx.ext.web.client.WebClient.create(ctx.vertx())
-          .post(5000, "127.0.0.1", "/reindex")
+          .postAbs(ragReindexUrl)
           .send()
           .onSuccess(resp -> {
             ctx.response()
